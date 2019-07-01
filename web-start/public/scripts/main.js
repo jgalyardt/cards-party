@@ -1,19 +1,62 @@
-/**
- * Copyright 2018 Google Inc. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 'use strict';
+
+//JQuery definitions
+var selectedCard = undefined;
+
+$(function () {
+  dealStartingCards();
+
+});
+//End JQuery definitions ###!
+
+//HTML Templates
+var WHITE_CARD_TEMPLATE =
+  '<div class="mdl-cell mdl-cell--2-col">' +
+  '<div class="white-card-square mdl-card mdl-shadow--2dp">' +
+  '<div class="card-text mdl-card__supporting-text">' +
+  '</div>' +
+  '</div>' +
+  '</div>';
+
+//CAH functions
+function dealStartingCards() {
+  var query = firebase.firestore()
+    .collection('whitecards')
+    .limit(12);
+  query.onSnapshot(function (snapshot) {
+    snapshot.docChanges().forEach(function (change) {
+      var card = change.doc.data();
+      displayCardInHand(change.doc.id, card.text);
+    });
+  });
+}
+
+function displayCardInHand(id, text) {
+  var div = document.getElementById(id);
+  // If an element for that message does not exists yet we create it.
+  if (!div) {
+    var container = document.createElement('div');
+    container.innerHTML = WHITE_CARD_TEMPLATE;
+    div = container.firstChild;
+    div.firstChild.setAttribute('id', id);
+    handListElement.appendChild(div);
+  }
+  div.querySelector('.card-text').textContent = text;
+
+  $("#" + id).click(function () {
+    if (selectedCard != null) {
+      selectedCard.removeClass("selected");
+    }
+    $(this).addClass("selected");
+    selectedCard = $(this);
+  })
+}
+
+
+
+
+
+//End CAH functions ###!
 
 // Signs-in Friendly Chat.
 function signIn() {
@@ -53,7 +96,7 @@ function saveMessage(messageText) {
     text: messageText,
     profilePicUrl: getProfilePicUrl(),
     timestamp: firebase.firestore.FieldValue.serverTimestamp()
-  }).catch(function(error) {
+  }).catch(function (error) {
     console.error('Error writing new message to Firebase Database', error);
   });
 }
@@ -65,8 +108,8 @@ function loadMessages() {
     .orderBy('timestamp', 'desc')
     .limit(12);
 
-  query.onSnapshot(function(snapshot) {
-    snapshot.docChanges().forEach(function(change) {
+  query.onSnapshot(function (snapshot) {
+    snapshot.docChanges().forEach(function (change) {
       if (change.type == 'removed') {
         deleteMessage(change.doc.id);
       } else {
@@ -79,15 +122,15 @@ function loadMessages() {
 
 // Saves the messaging device token to the datastore.
 function saveMessagingDeviceToken() {
-  firebase.messaging().getToken().then(function(currentToken) {
+  firebase.messaging().getToken().then(function (currentToken) {
     if (currentToken) {
       console.log('Got FCM device token:', currentToken);
       firebase.firestore().collection('fcmTokens').doc(currentToken)
-        .set({uid: firebase.auth().currentUser.uid});
+        .set({ uid: firebase.auth().currentUser.uid });
     } else {
       requestNotificationsPermissions();
     }
-  }).catch(function(error) {
+  }).catch(function (error) {
     console.error('Unable to get messaging token.', error);
   });
 }
@@ -95,9 +138,9 @@ function saveMessagingDeviceToken() {
 // Requests permissions to show notifications.
 function requestNotificationsPermissions() {
   console.log('Requesting notifications permission...');
-  firebase.messaging().requestPermission().then(function() {
+  firebase.messaging().requestPermission().then(function () {
     saveMessagingDeviceToken();
-  }).catch(function(error) {
+  }).catch(function (error) {
     console.error('Unable to get permission to notify.', error);
   });
 }
@@ -107,7 +150,7 @@ function onMessageFormSubmit(e) {
   e.preventDefault();
   // Check that the user entered a message and is signed in.
   if (messageInputElement.value && checkSignedInWithMessage()) {
-    saveMessage(messageInputElement.value).then(function() {
+    saveMessage(messageInputElement.value).then(function () {
       // Clear message text field and re-enable the SEND button.
       resetMaterialTextfield(messageInputElement);
       toggleButton();
@@ -171,11 +214,11 @@ function resetMaterialTextfield(element) {
 
 // Template for messages.
 var MESSAGE_TEMPLATE =
-    '<div class="message-container">' +
-      '<div class="spacing"><div class="pic"></div></div>' +
-      '<div class="message"></div>' +
-      '<div class="name"></div>' +
-    '</div>';
+  '<div class="message-container">' +
+  '<div class="spacing"><div class="pic"></div></div>' +
+  '<div class="message"></div>' +
+  '<div class="name"></div>' +
+  '</div>';
 
 // Adds a size to Google Profile pics URLs.
 function addSizeToGoogleProfilePic(url) {
@@ -227,7 +270,7 @@ function displayMessage(id, timestamp, name, text, picUrl, imageUrl) {
     messageElement.innerHTML = messageElement.innerHTML.replace(/\n/g, '<br>');
   }
   // Show the card fading-in and scroll to view the new message.
-  setTimeout(function() {div.classList.add('visible')}, 1);
+  setTimeout(function () { div.classList.add('visible') }, 1);
   messageListElement.scrollTop = messageListElement.scrollHeight;
   messageInputElement.focus();
 }
@@ -246,8 +289,8 @@ function toggleButton() {
 function checkSetup() {
   if (!window.firebase || !(firebase.app instanceof Function) || !firebase.app().options) {
     window.alert('You have not configured and imported the Firebase SDK. ' +
-        'Make sure you go through the codelab setup instructions and make ' +
-        'sure you are running the codelab using `firebase serve`');
+      'Make sure you go through the codelab setup instructions and make ' +
+      'sure you are running the codelab using `firebase serve`');
   }
 }
 
@@ -255,6 +298,8 @@ function checkSetup() {
 checkSetup();
 
 // Shortcuts to DOM Elements.
+var handListElement = document.getElementById('hand-container');
+
 var messageListElement = document.getElementById('messages');
 var messageFormElement = document.getElementById('message-form');
 var messageInputElement = document.getElementById('message');
@@ -280,7 +325,7 @@ initFirebaseAuth();
 
 // Remove the warning about timstamps change. 
 var firestore = firebase.firestore();
-var settings = {timestampsInSnapshots: true};
+var settings = { timestampsInSnapshots: true };
 firestore.settings(settings);
 
 // TODO: Enable Firebase Performance Monitoring.

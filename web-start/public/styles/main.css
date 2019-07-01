@@ -33,6 +33,7 @@ body {
 .white-card-square.mdl-card {
   width: 200px;
   height: 170px;
+  cursor: pointer;
   background: white;
 }
 
@@ -40,6 +41,10 @@ body {
   padding-top: 10px;
   font-size: 18px;
   color: black;
+}
+
+.white-card-square.selected {
+  border: 1px solid red;
 }
 
 #game-container {
