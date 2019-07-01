@@ -77,29 +77,6 @@ function loadMessages() {
   });
 }
 
-// Saves a new message containing an image in Firebase.
-// This first saves the image in Firebase storage.
-function saveImageMessage(file) {
-  firebase.firestore().collection('messages').add({
-    name: getUserName(),
-    imageUrl: LOADING_IMAGE_URL,
-    profilePicUrl: getProfilePicUrl(),
-    timestamp: firebase.firestore.FieldValue.serverTimestamp()
-  }).then(function(messageRef) {
-    var filePath = firebase.auth().currentUser.uid + '/' + messageRef.id + '/' + file.name;
-    return firebase.storage().ref(filePath).put(file).then(function(fileSnapshot) {
-      return fileSnapshot.ref.getDownloadURL().then((url => {
-        return messageRef.update({
-          imageUrl: url,
-          storageUri: fileSnapshot.metadata.fullPath
-        });
-      }));
-    });
-  }).catch(function(error) {
-    console.error('There was an error uploading a file to Cloud Storage:', error);
-  });
-}
-
 // Saves the messaging device token to the datastore.
 function saveMessagingDeviceToken() {
   firebase.messaging().getToken().then(function(currentToken) {
@@ -123,29 +100,6 @@ function requestNotificationsPermissions() {
   }).catch(function(error) {
     console.error('Unable to get permission to notify.', error);
   });
-}
-
-// Triggered when a file is selected via the media picker.
-function onMediaFileSelected(event) {
-  event.preventDefault();
-  var file = event.target.files[0];
-
-  // Clear the selection in the file picker input.
-  imageFormElement.reset();
-
-  // Check if the file is an image.
-  if (!file.type.match('image.*')) {
-    var data = {
-      message: 'You can only share images',
-      timeout: 2000
-    };
-    signInSnackbarElement.MaterialSnackbar.showSnackbar(data);
-    return;
-  }
-  // Check if the user is signed-in
-  if (checkSignedInWithMessage()) {
-    saveImageMessage(file);
-  }
 }
 
 // Triggered when the send new message form is submitted.
@@ -271,14 +225,6 @@ function displayMessage(id, timestamp, name, text, picUrl, imageUrl) {
     messageElement.textContent = text;
     // Replace all line breaks by <br>.
     messageElement.innerHTML = messageElement.innerHTML.replace(/\n/g, '<br>');
-  } else if (imageUrl) { // If the message is an image.
-    var image = document.createElement('img');
-    image.addEventListener('load', function() {
-      messageListElement.scrollTop = messageListElement.scrollHeight;
-    });
-    image.src = imageUrl + '&' + new Date().getTime();
-    messageElement.innerHTML = '';
-    messageElement.appendChild(image);
   }
   // Show the card fading-in and scroll to view the new message.
   setTimeout(function() {div.classList.add('visible')}, 1);
@@ -313,9 +259,7 @@ var messageListElement = document.getElementById('messages');
 var messageFormElement = document.getElementById('message-form');
 var messageInputElement = document.getElementById('message');
 var submitButtonElement = document.getElementById('submit');
-var imageButtonElement = document.getElementById('submitImage');
-var imageFormElement = document.getElementById('image-form');
-var mediaCaptureElement = document.getElementById('mediaCapture');
+
 var userPicElement = document.getElementById('user-pic');
 var userNameElement = document.getElementById('user-name');
 var signInButtonElement = document.getElementById('sign-in');
@@ -330,13 +274,6 @@ signInButtonElement.addEventListener('click', signIn);
 // Toggle for the button.
 messageInputElement.addEventListener('keyup', toggleButton);
 messageInputElement.addEventListener('change', toggleButton);
-
-// Events for image upload.
-imageButtonElement.addEventListener('click', function(e) {
-  e.preventDefault();
-  mediaCaptureElement.click();
-});
-mediaCaptureElement.addEventListener('change', onMediaFileSelected);
 
 // initialize Firebase
 initFirebaseAuth();
