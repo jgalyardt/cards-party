@@ -31,7 +31,7 @@ body {
 }
 
 .white-card-square.mdl-card {
-  width: 200px;
+  width: 10vw;
   height: 170px;
   cursor: pointer;
   background: white;
@@ -48,7 +48,7 @@ body {
 }
 
 #game-container {
-  height: 500px;
+  height: 55vh;
 }
 
 main,
@@ -159,42 +159,25 @@ main,
   background: linear-gradient(white, #f9f9f9);
   justify-content: space-between;
 }
+
+#info-container {
+  margin-bottom: -35px;
+}
+
 #user-container {
-  position: absolute;
-  display: flex;
-  flex-direction: row;
-  top: 22px;
-  width: 100%;
-  right: 0;
-  padding-left: 10px;
-  justify-content: flex-end;
-  padding-right: 10px;
+  color: white;
+  z-index: 2;
+  background-color: #039be5;
+  width: 260px;
 }
-#user-container #user-pic {
-  top: -3px;
-  position: relative;
-  display: inline-block;
-  background-image: url("/images/profile_placeholder.png");
-  background-repeat: no-repeat;
-  width: 40px;
-  height: 40px;
-  background-size: 40px;
-  border-radius: 20px;
-}
+
 #user-container #user-name {
+  display: inline;
   font-size: 16px;
-  line-height: 36px;
   padding-right: 10px;
   padding-left: 20px;
 }
-#image-form #submitImage {
-  width: auto;
-  padding: 0 6px 0 1px;
-  min-width: 0;
-}
-#image-form #submitImage .material-icons {
-  top: -1px;
-}
+
 .message img {
   max-width: 300px;
   max-height: 200px;
@@ -204,11 +187,11 @@ main,
 }
 @media screen and (max-width: 610px) {
   header {
-    height: 113px;
+    height: 80px;
     padding-bottom: 80px !important;
   }
   #user-container {
-    top: 72px;
+    top: 0px;
     background-color: rgb(3, 155, 229);
     height: 38px;
     padding-top: 3px;
