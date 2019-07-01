@@ -5,11 +5,18 @@ var selectedCard = undefined;
 
 $(function () {
   dealStartingCards();
-
+  loadActiveCards();
 });
-//End JQuery definitions ###!
 
 //HTML Templates
+var HAND_CARD_TEMPLATE =
+  '<div class="mdl-cell mdl-cell--2-col">' +
+  '<div class="hand-card-square mdl-card mdl-shadow--2dp">' +
+  '<div class="card-text mdl-card__supporting-text">' +
+  '</div>' +
+  '</div>' +
+  '</div>';
+
 var WHITE_CARD_TEMPLATE =
   '<div class="mdl-cell mdl-cell--2-col">' +
   '<div class="white-card-square mdl-card mdl-shadow--2dp">' +
@@ -21,7 +28,7 @@ var WHITE_CARD_TEMPLATE =
 //CAH functions
 function dealStartingCards() {
   var query = firebase.firestore()
-    .collection('whitecards')
+    .collection('white-cards')
     .limit(12);
   query.onSnapshot(function (snapshot) {
     snapshot.docChanges().forEach(function (change) {
@@ -36,7 +43,7 @@ function displayCardInHand(id, text) {
   // If an element for that message does not exists yet we create it.
   if (!div) {
     var container = document.createElement('div');
-    container.innerHTML = WHITE_CARD_TEMPLATE;
+    container.innerHTML = HAND_CARD_TEMPLATE;
     div = container.firstChild;
     div.firstChild.setAttribute('id', id);
     handListElement.appendChild(div);
@@ -52,13 +59,61 @@ function displayCardInHand(id, text) {
   })
 }
 
+function submitCards() {
+  return firebase.firestore().collection('active-cards').add({
+    id: $(selectedCard).attr("id"),
+    text: $(selectedCard).text()
+  }).catch(function (error) {
+    console.error('Error writing new message to Firebase Database', error);
+  });
+}
 
+function loadActiveCards() {
+  var query = firebase.firestore()
+    .collection('active-cards')
+    .limit(10);
+  query.onSnapshot(function (snapshot) {
+    snapshot.docChanges().forEach(function (change) {
+      if (change.type == 'removed') {
+        removeCardFromUI(change.doc.id);
+      } else {
+        var card = change.doc.data();
+        displayActiveCard(change.doc.id, card.text);
+      }
+    });
+  });
+}
 
+function displayActiveCard(id, text) {
+  var div = document.getElementById(id);
+  // If an element for that message does not exists yet we create it.
+  if (!div) {
+    var container = document.createElement('div');
+    container.innerHTML = WHITE_CARD_TEMPLATE;
+    div = container.firstChild;
+    div.firstChild.setAttribute('id', id);
+    responseListElement.appendChild(div);
+  }
+  div.querySelector('.card-text').textContent = text;
 
+  $("#" + id).click(function () {
+    $(this).fadeOut(400, function() {
+      firebase.firestore().collection('active-cards').doc(id).delete().then(function() {
+          console.log("Document successfully deleted!");
+      }).catch(function(error) {
+          console.error("Error removing document: ", error);
+      });
+    });
+  })
+}
+
+function removeCardFromUI(id) {
+  $("#" + id).parent().remove();
+}
 
 //End CAH functions ###!
 
-// Signs-in Friendly Chat.
+// Signs-in for chat.
 function signIn() {
   var provider = new firebase.auth.GoogleAuthProvider();
   firebase.auth().signInWithPopup(provider);
@@ -295,6 +350,8 @@ checkSetup();
 
 // Shortcuts to DOM Elements.
 var handListElement = document.getElementById('hand-container');
+var responseListElement = document.getElementById('response-container');
+var submitCardsElement = document.getElementById('submit-cards')
 
 var messageListElement = document.getElementById('messages');
 var messageFormElement = document.getElementById('message-form');
@@ -305,6 +362,9 @@ var userNameElement = document.getElementById('user-name');
 var signInButtonElement = document.getElementById('sign-in');
 var signOutButtonElement = document.getElementById('sign-out');
 var signInSnackbarElement = document.getElementById('must-signin-snackbar');
+
+//Listeners
+submitCardsElement.addEventListener('click', submitCards);
 
 // Saves message on form submit.
 messageFormElement.addEventListener('submit', onMessageFormSubmit);
