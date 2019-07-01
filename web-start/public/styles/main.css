@@ -14,15 +14,46 @@
  * limitations under the License.
  */
 
- html, body {
-  font-family: 'Roboto', 'Helvetica', sans-serif;
+html,
+body {
+  font-family: "Roboto", "Helvetica", sans-serif;
 }
-main, #messages-card {
+.black-card-square.mdl-card {
+  width: 220px;
+  height: 220px;
+  background: black;
+}
+
+.black-card-square > .mdl-card__supporting-text {
+  padding-top: 10px;
+  font-size: 18px;
+  color: white;
+}
+
+.white-card-square.mdl-card {
+  width: 200px;
+  height: 170px;
+  background: white;
+}
+
+.white-card-square > .mdl-card__supporting-text {
+  padding-top: 10px;
+  font-size: 18px;
+  color: black;
+}
+
+#game-container {
+  height: 500px;
+}
+
+main,
+#messages-card {
   height: 100%;
   padding-bottom: 0;
 }
+
 #messages-card-container {
-  height: 300px;
+  height: 365px;
   padding-bottom: 0;
 }
 #messages-card {
@@ -33,7 +64,7 @@ main, #messages-card {
   margin-top: 17px;
 }
 .mdl-grid {
-  max-width: 1024px;
+  max-width: 1920px;
   margin: auto;
 }
 .material-icons {
@@ -53,6 +84,7 @@ main, #messages-card {
 }
 #messages {
   overflow-y: auto;
+  margin-top: 10px;
   margin-bottom: 10px;
   height: calc(100% - 80px);
   display: flex;
@@ -76,7 +108,7 @@ main, #messages-card {
   opacity: 1;
 }
 .message-container .pic {
-  background-image: url('/images/profile_placeholder.png');
+  background-image: url("/images/profile_placeholder.png");
   background-repeat: no-repeat;
   width: 30px;
   height: 30px;
@@ -104,21 +136,16 @@ main, #messages-card {
 #message-form {
   display: flex;
   flex-direction: row;
-  width: calc(100% - 48px);
+  width: calc(100%);
   float: left;
 }
-#image-form {
-  display: flex;
-  flex-direction: row;
-  width: 48px;
-  float: right;
-}
+
 #message-form .mdl-textfield {
   width: calc(100% - 100px);
 }
-#message-form button, #image-form button {
+#message-form button {
   width: 100px;
-  margin: 15px 0 0 10px;
+  margin: 15px 0 0 30px;
 }
 .mdl-card {
   min-height: 0;
@@ -142,7 +169,7 @@ main, #messages-card {
   top: -3px;
   position: relative;
   display: inline-block;
-  background-image: url('/images/profile_placeholder.png');
+  background-image: url("/images/profile_placeholder.png");
   background-repeat: no-repeat;
   width: 40px;
   height: 40px;
@@ -177,7 +204,7 @@ main, #messages-card {
   }
   #user-container {
     top: 72px;
-    background-color: rgb(3,155,229);
+    background-color: rgb(3, 155, 229);
     height: 38px;
     padding-top: 3px;
     padding-right: 2px;
@@ -190,12 +217,13 @@ main, #messages-card {
   }
 }
 .mdl-textfield__label:after {
-  background-color: #0288D1;
+  background-color: #0288d1;
 }
 .mdl-textfield--floating-label.is-focused .mdl-textfield__label {
-  color: #0288D1;
+  color: #0288d1;
 }
 .mdl-button .material-icons {
   top: -1px;
   margin-right: 5px;
 }
+
