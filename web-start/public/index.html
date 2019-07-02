@@ -76,9 +76,18 @@
             </div>
           </div>
           <br>
-          <button id="submit-cards" class="mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect">
-            Submit Card
-          </button>
+          <div id="controls-container" class="mdl-cell mdl-cell--12-col mdl-grid">
+            <div class="mdl-cell mdl-cell--6-col">
+              <button id="submit-cards" class="mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect">
+                Submit Card
+              </button>
+            </div>
+            <div class="mdl-cell mdl-cell--6-col">
+              <button id="join-game" class="mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect">
+                JOIN GAME
+              </button>
+            </div>
+          </div>
 
         </div>
         <div class="mdl-cell mdl-cell--10-col">
@@ -88,8 +97,7 @@
       </div>
 
       <div id="info-container" class="mdl-cell mdl-cell--12-col mdl-grid">
-        <div id="user-container" class="mdl-cell mdl-cell--2-col">
-          <div hidden id="user-name"></div>
+        <div id="user-container" class="mdl-cell mdl-cell--1-col">
           <button hidden id="sign-out" class="mdl-button mdl-js-button mdl-js-ripple-effect mdl-color-text--white">
             Sign-out
           </button>
@@ -97,6 +105,10 @@
             <i class="material-icons">account_circle</i>Sign-in with Google
           </button>
         </div>
+        <div id="score-container" class="mdl-cell mdl-cell--1-col">
+          JG: 
+        </div>
+
       </div>
 
 

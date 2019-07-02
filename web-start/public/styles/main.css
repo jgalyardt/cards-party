@@ -18,9 +18,20 @@ html,
 body {
   font-family: "Roboto", "Helvetica", sans-serif;
 }
+
+#controls-container {
+  padding: 0px;
+}
+
+#score-container {
+  font-size: 16px;
+  background-color: white;
+  padding: 5px 10px 0px 10px;
+}
+
 .black-card-square.mdl-card {
-  width: 14vw;
-  height: 14vw;
+  width: 15vw;
+  height: 13vw;
   background: black;
 }
 
@@ -178,21 +189,13 @@ main,
 }
 
 #info-container {
-  margin-bottom: -35px;
+  margin-bottom: -25px;
 }
 
-#user-container {
+#user-container > button {
   color: white;
   z-index: 2;
   background-color: #039be5;
-  width: 260px;
-}
-
-#user-container #user-name {
-  display: inline;
-  font-size: 16px;
-  padding-right: 10px;
-  padding-left: 20px;
 }
 
 .message img {
