@@ -21,23 +21,33 @@ body {
 
 #controls-container {
   padding: 0px;
+  margin-left: -5px;
 }
 
-#score-container {
+.score-panel {
   font-size: 16px;
   background-color: white;
   padding: 5px 10px 0px 10px;
 }
 
+.score-panel > .score-name {
+  display: inline; 
+}
+
+.score-panel > .score-number {
+  float: right; 
+}
+
+
 .black-card-square.mdl-card {
-  width: 15vw;
+  width: 14vw;
   height: 13vw;
   background: black;
 }
 
 .black-card-square > .mdl-card__supporting-text {
   padding-top: 10px;
-  font-size: 18px;
+  font-size: 22px;
   color: white;
 }
 

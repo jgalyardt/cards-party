@@ -25,7 +25,19 @@ var WHITE_CARD_TEMPLATE =
   '</div>' +
   '</div>';
 
+var PLAYER_SCORE_TEMPLATE =
+  '<div class="mdl-cell mdl-cell--2-col">' +
+  '<div class="white-card-square mdl-card mdl-shadow--2dp">' +
+  '<div class="card-text mdl-card__supporting-text">' +
+  '</div>' +
+  '</div>' +
+  '</div>';
+
 //CAH functions
+function joinGame() {
+  //TODO
+}
+
 function dealStartingCards() {
   var query = firebase.firestore()
     .collection('white-cards')
@@ -97,7 +109,7 @@ function displayActiveCard(id, text) {
   div.querySelector('.card-text').textContent = text;
 
   $("#" + id).click(function () {
-    $(this).fadeOut(400, function() {
+    $(this).fadeOut(200, function() {
       firebase.firestore().collection('active-cards').doc(id).delete().then(function() {
           console.log("Document successfully deleted!");
       }).catch(function(error) {
