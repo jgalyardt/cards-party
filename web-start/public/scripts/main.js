@@ -120,10 +120,15 @@ function removeCardFromUI(id) {
 }
 
 function joinGame() {
-  var ref = firebase.database().ref('players');
-  ref.orderByChild('name').equalTo(getUserName()).on('child_added', function(snapshot) {
-    console.log(snapshot.key);
-    if (snapshot.getValue() == null) {
+  var query = firebase.firestore()
+    .collection('players')
+    .where('name', '==', getUserName());
+  query.get().then(function(snapshot) {
+    if (snapshot.size > 0) {
+      console.log("Player '" + getUserName() + "' is already in the game.");
+      return;
+    }
+    else {
       return firebase.firestore().collection('players').add({
         name: getUserName(),
         initials: getInitials(),
@@ -132,8 +137,11 @@ function joinGame() {
         console.error('Error writing new message to Firebase Database', error);
       });
     }
+  }).catch(function (error) {
+    console.error('Error reading from Firebase Database', error);
   });
-  console.log(ref);
+  
+  
 }
 
 function getInitials() {
@@ -173,7 +181,7 @@ function displayPlayer(id, initials, score) {
   $("#" + id).click(function () {
     $(this).fadeOut(200, function() {
       firebase.firestore().collection('players').doc(id).delete().then(function() {
-          console.log("Player successfully deleted!");
+          //console.log("Player successfully deleted!");
       }).catch(function(error) {
           console.error("Error removing document: ", error);
       });

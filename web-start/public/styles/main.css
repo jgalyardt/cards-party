@@ -42,7 +42,7 @@ body {
 .black-card-square.mdl-card {
   width: 14vw;
   height: 13vw;
-  background: rgb(70, 36, 36);
+  background: rgb(0, 103, 134);
 }
 
 .black-card-square > .mdl-card__supporting-text {
