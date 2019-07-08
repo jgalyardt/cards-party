@@ -2,11 +2,10 @@
 
 //JQuery definitions
 var selectedCard = undefined;
+var whiteCardDeck = [];
 
 $(function () {
-  dealStartingCards();
-  loadActiveCards();
-  loadPlayers();
+  initializeGame();
 });
 
 //HTML Templates
@@ -34,7 +33,50 @@ var PLAYER_SCORE_TEMPLATE =
 
 //CAH functions
 
-function dealStartingCards() {
+function initializeGame() {
+  loadActiveCards();
+  loadPlayers(); 
+}
+
+function startGame() {
+  
+  shuffleCards();
+
+  var cardQuery = firebase.firestore()
+    .collection('white-cards')
+  cardQuery.get().then(function (snapshot) {
+
+    snapshot.forEach(function (card) {
+      console.log(card.get('text'));
+    });
+  });
+
+  getStartingCards();
+}
+
+function shuffleCards() {
+  
+  var cardQuery = firebase.firestore()
+    .collection('white-cards')
+  cardQuery.get().then(function (snapshot) {
+    var numCards = snapshot.size;
+    
+    for (var i = 0; i < numCards; i += 1) {
+      whiteCardDeck.push(0);
+    }
+
+    for (var i = numCards - 1; i > 0; i -= 1) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var temp = whiteCardDeck[i];
+      whiteCardDeck[i] = whiteCardDeck[j];
+      whiteCardDeck[j] = temp;
+    }
+
+  });
+
+}
+
+function getStartingCards() {
   var query = firebase.firestore()
     .collection('white-cards')
     .limit(12);
@@ -129,6 +171,8 @@ function joinGame() {
       return;
     }
     else {
+      $("#join-game").prop("disabled", true);
+      $("#join-game").removeClass("waiting");
       return firebase.firestore().collection('players').add({
         name: getUserName(),
         initials: getInitials(),
@@ -140,8 +184,6 @@ function joinGame() {
   }).catch(function (error) {
     console.error('Error reading from Firebase Database', error);
   });
-  
-  
 }
 
 function getInitials() {
@@ -157,6 +199,8 @@ function loadPlayers() {
     snapshot.docChanges().forEach(function (change) {
       if (change.type == 'removed') {
         $("#" + change.doc.id).remove();
+        $("#join-game").prop("disabled", false);
+        $("#join-game").addClass("waiting");
       } else {
         var player = change.doc.data();
         displayPlayer(change.doc.id, player.initials, player.score);
@@ -195,6 +239,9 @@ function displayPlayer(id, initials, score) {
 function signIn() {
   var provider = new firebase.auth.GoogleAuthProvider();
   firebase.auth().signInWithPopup(provider);
+  //Make the join-game button start flashing
+  $("#join-game").prop("disabled", false);
+  $("#join-game").addClass("waiting");
 }
 
 // Signs-out of Friendly Chat.
@@ -429,6 +476,7 @@ var responseListElement = document.getElementById('response-container');
 var infoListElement = document.getElementById('info-container');
 var submitCardsElement = document.getElementById('submit-cards');
 var joinGameElement = document.getElementById('join-game');
+var startGameElement = document.getElementById('start-game');
 
 var messageListElement = document.getElementById('messages');
 var messageFormElement = document.getElementById('message-form');
@@ -442,6 +490,7 @@ var signInSnackbarElement = document.getElementById('must-signin-snackbar');
 //Listeners
 submitCardsElement.addEventListener('click', submitCards);
 joinGameElement.addEventListener('click', joinGame);
+startGameElement.addEventListener('click', startGame);
 
 // Saves message on form submit.
 messageFormElement.addEventListener('submit', onMessageFormSubmit);

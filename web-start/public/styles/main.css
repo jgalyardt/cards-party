@@ -24,6 +24,18 @@ body {
   margin-left: -5px;
 }
 
+#join-game.waiting{
+  animation-name: joinGameKF;
+  animation-duration: 3s;
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+}
+
+@keyframes joinGameKF {
+  from {color: black;}
+  to {color: lime;}
+}
+
 .score-panel {
   font-size: 16px;
   background-color: white;
