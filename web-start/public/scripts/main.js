@@ -6,6 +6,7 @@ var selectedCard = undefined;
 $(function () {
   dealStartingCards();
   loadActiveCards();
+  loadPlayers();
 });
 
 //HTML Templates
@@ -26,17 +27,12 @@ var WHITE_CARD_TEMPLATE =
   '</div>';
 
 var PLAYER_SCORE_TEMPLATE =
-  '<div class="mdl-cell mdl-cell--2-col">' +
-  '<div class="white-card-square mdl-card mdl-shadow--2dp">' +
-  '<div class="card-text mdl-card__supporting-text">' +
-  '</div>' +
-  '</div>' +
+  '<div class="score-panel mdl-cell mdl-cell--1-col">' +
+  '<div class="score-initials"></div>' +
+  '<div class="score-number"></div>' +
   '</div>';
 
 //CAH functions
-function joinGame() {
-  //TODO
-}
 
 function dealStartingCards() {
   var query = firebase.firestore()
@@ -121,6 +117,68 @@ function displayActiveCard(id, text) {
 
 function removeCardFromUI(id) {
   $("#" + id).parent().remove();
+}
+
+function joinGame() {
+  var ref = firebase.database().ref('players');
+  ref.orderByChild('name').equalTo(getUserName()).on('child_added', function(snapshot) {
+    console.log(snapshot.key);
+    if (snapshot.getValue() == null) {
+      return firebase.firestore().collection('players').add({
+        name: getUserName(),
+        initials: getInitials(),
+        score: 0
+      }).catch(function (error) {
+        console.error('Error writing new message to Firebase Database', error);
+      });
+    }
+  });
+  console.log(ref);
+}
+
+function getInitials() {
+  var nameArray = getUserName().split(" ");
+  return nameArray[0].charAt(0) + nameArray[1].charAt(0);
+}
+
+function loadPlayers() {
+  var query = firebase.firestore()
+    .collection('players')
+    .limit(10);
+  query.onSnapshot(function (snapshot) {
+    snapshot.docChanges().forEach(function (change) {
+      if (change.type == 'removed') {
+        $("#" + change.doc.id).remove();
+      } else {
+        var player = change.doc.data();
+        displayPlayer(change.doc.id, player.initials, player.score);
+      }
+    });
+  });
+}
+
+function displayPlayer(id, initials, score) {
+  var div = document.getElementById(id);
+  // If an element for that message does not exists yet we create it.
+  if (!div) {
+    var container = document.createElement('div');
+    container.innerHTML = PLAYER_SCORE_TEMPLATE;
+    div = container.firstChild;
+    div.setAttribute('id', id);
+    infoListElement.appendChild(div);
+  }
+  div.querySelector('.score-initials').textContent = initials + ':';
+  div.querySelector('.score-number').textContent = score.toString();
+
+  $("#" + id).click(function () {
+    $(this).fadeOut(200, function() {
+      firebase.firestore().collection('players').doc(id).delete().then(function() {
+          console.log("Player successfully deleted!");
+      }).catch(function(error) {
+          console.error("Error removing document: ", error);
+      });
+    });
+  })
 }
 
 //End CAH functions ###!
@@ -360,7 +418,9 @@ checkSetup();
 // Shortcuts to DOM Elements.
 var handListElement = document.getElementById('hand-container');
 var responseListElement = document.getElementById('response-container');
-var submitCardsElement = document.getElementById('submit-cards')
+var infoListElement = document.getElementById('info-container');
+var submitCardsElement = document.getElementById('submit-cards');
+var joinGameElement = document.getElementById('join-game');
 
 var messageListElement = document.getElementById('messages');
 var messageFormElement = document.getElementById('message-form');
@@ -373,6 +433,7 @@ var signInSnackbarElement = document.getElementById('must-signin-snackbar');
 
 //Listeners
 submitCardsElement.addEventListener('click', submitCards);
+joinGameElement.addEventListener('click', joinGame);
 
 // Saves message on form submit.
 messageFormElement.addEventListener('submit', onMessageFormSubmit);

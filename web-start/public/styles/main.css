@@ -30,7 +30,7 @@ body {
   padding: 5px 10px 0px 10px;
 }
 
-.score-panel > .score-name {
+.score-panel > .score-initials {
   display: inline; 
 }
 
@@ -42,7 +42,7 @@ body {
 .black-card-square.mdl-card {
   width: 14vw;
   height: 13vw;
-  background: black;
+  background: rgb(70, 36, 36);
 }
 
 .black-card-square > .mdl-card__supporting-text {
