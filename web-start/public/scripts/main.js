@@ -1,8 +1,10 @@
 'use strict';
 
-//JQuery definitions
+//Game setup variables
+var STARTING_HAND_SIZE = 3;
+
+//Backend declarations
 var selectedCard = undefined;
-var whiteCardDeck = [];
 
 $(function () {
   initializeGame();
@@ -35,51 +37,75 @@ var PLAYER_SCORE_TEMPLATE =
 
 function initializeGame() {
   loadActiveCards();
-  loadPlayers(); 
+  loadPlayers();
+  bindGameState();
+}
+
+//Snapshot to the game-state collection and run commands when a change happens
+function bindGameState() {
+  var query = firebase.firestore()
+    .collection('game-state')
+  query.onSnapshot(function (snapshot) {
+    snapshot.docChanges().forEach(function (change) {
+        if (change.doc.get('state') == 'getStartingCards') {
+          getStartingCards();
+        }
+    });
+  });
 }
 
 function startGame() {
-  
-  shuffleCards();
-
-  var cardQuery = firebase.firestore()
-    .collection('white-cards')
-  cardQuery.get().then(function (snapshot) {
-
-    snapshot.forEach(function (card) {
-      console.log(card.get('text'));
-    });
-  });
-
-  getStartingCards();
+  assignCards();
 }
 
-function shuffleCards() {
-  
-  var cardQuery = firebase.firestore()
-    .collection('white-cards')
-  cardQuery.get().then(function (snapshot) {
-    var numCards = snapshot.size;
-    
-    for (var i = 0; i < numCards; i += 1) {
-      whiteCardDeck.push(0);
-    }
-
-    for (var i = numCards - 1; i > 0; i -= 1) {
-      var j = Math.floor(Math.random() * (i + 1));
-      var temp = whiteCardDeck[i];
-      whiteCardDeck[i] = whiteCardDeck[j];
-      whiteCardDeck[j] = temp;
-    }
-
+function assignCards() {
+  var playerQuery = firebase.firestore()
+    .collection('players');
+  playerQuery.get().then(function (players) {
+    var cardQuery = firebase.firestore()
+      .collection('white-cards');
+    cardQuery.get().then(function(cards) {
+      //Create a shuffled card order (emulates a deck of cards)
+      var deck = [];
+      for (var i = 0; i < cards.size; i++) {
+        deck.push(i);
+      }
+      for (var i = cards.size - 1; i > 0; i--) {
+        var j = Math.floor(Math.random() * (i + 1));
+        var temp = deck[i];
+        deck[i] = deck[j];
+        deck[j] = temp;
+      }
+      //Assign players a number of cards equal to STARTING_HAND_SIZE
+      var deckIndex = 0;
+      players.forEach(function (player) {
+        for (var i = 0; i < STARTING_HAND_SIZE; i++) {
+          if (deckIndex > deck.length) {
+            console.log("Error: Not enough white cards for all players!");
+            break;
+          }
+          cards.docs[deck[deckIndex]].ref.set({
+            assignedPlayer: player.get('name')
+          }, { merge: true });
+          deckIndex++;
+        }
+      });
+    });
   });
-
+  var stateQuery = firebase.firestore()
+    .collection('game-state');
+  stateQuery.get().then(function (state) {
+    state.docs[0].ref.set({
+      state: 'getStartingCards'
+    });
+  });
 }
 
 function getStartingCards() {
   var query = firebase.firestore()
     .collection('white-cards')
-    .limit(12);
+    .limit(STARTING_HAND_SIZE)
+    .where('assignedPlayer', '==', getUserName());
   query.onSnapshot(function (snapshot) {
     snapshot.docChanges().forEach(function (change) {
       var card = change.doc.data();
