@@ -1,16 +1,6 @@
-# Firebase Codelab: FriendlyChat
+# Cards Party
 
-This is the source code for the Firebase FriendlyChat codelab. It includes start and end versions of the
-code for Web, Cloud Functions, Performance Monitoring. To get started, open the codelab instructions:
-
- - [Firebase Web Codelab](https://codelabs.developers.google.com/codelabs/firebase-web/).
- - [Firebase SDK for Cloud Functions Codelab](https://codelabs.developers.google.com/codelabs/firebase-cloud-functions/).
- - [Firebase Performance Monitoring for Web Codelab](https://codelabs.developers.google.com/codelabs/firebase-perf-mon-web/).
-
-
-## How to make contributions?
-Please read and follow the steps in the [CONTRIBUTING.md](CONTRIBUTING.md)
-
+This is an open source implementation of Cards Against Humanity utilizing Firebase. I created this project to learn Firebase, using Google's FriendlyChat tutorial as a starting point.
 
 ## License
 See [LICENSE](LICENSE)
