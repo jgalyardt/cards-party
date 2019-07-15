@@ -4,7 +4,7 @@
 var STARTING_HAND_SIZE = 3;
 var WHITE_DECK = [];
 var WHITE_INDEX = 0; //Tracks position in WHITE_DECK
-var TURN_ORDER = [];
+var NUM_PLAYERS = 0;
 var TURN_INDEX = 0;
 var IS_IN_GAME = false;
 
@@ -103,7 +103,6 @@ function startGame() {
     });
   });
   startFirstTurn();
-
 }
 
 function endGame() {
@@ -133,17 +132,20 @@ function startFirstTurn() {
   var playerQuery = firebase.firestore()
     .collection('players');
   playerQuery.get().then(function (players) {
+    NUM_PLAYERS = players.size;
     var cardQuery = firebase.firestore()
       .collection('white-cards');
     cardQuery.get().then(function (cards) {
+      
+      //NOTE: This commented out code may be redundant if endGame() is always called,
+      //which would decrease the number of reads needed per game
+
       //Reset any previously assigned cards
-      cards.forEach(function (card) {
-        if (card.get('assignedPlayer') != '') {
-          card.ref.set({
-            text: card.get('text'),
-          });
-        }
-      });
+      // cards.forEach(function (card) { 
+      //   card.ref.set({
+      //     text: card.get('text'),
+      //   });
+      // });
 
       //Create a shuffled card order (emulates a deck of cards)
       WHITE_DECK = [];
@@ -171,19 +173,19 @@ function startFirstTurn() {
           }, { merge: true });
           WHITE_INDEX++;
         }
-        //While we have the players in memory, also create the turn order
-        TURN_ORDER.push(playerName);
       });
       //Randomly select a player to start
-      TURN_INDEX = Math.floor(Math.random() * TURN_ORDER.length);
+      TURN_INDEX = Math.floor(Math.random() * NUM_PLAYERS);
+      players.docs[TURN_INDEX].ref.set({
+        czar: true
+      }, { merge: true });
     });
   });
   var stateQuery = firebase.firestore()
     .collection('game-state');
   stateQuery.get().then(function (state) {
     state.docs[0].ref.set({
-      state: 'bindHand',
-      czar: TURN_ORDER[TURN_INDEX]
+      state: 'bindHand'
     });
   });
 }
