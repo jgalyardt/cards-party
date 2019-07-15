@@ -2,6 +2,9 @@
 
 //Game setup variables
 var STARTING_HAND_SIZE = 3;
+var WHITE_DECK = [];
+var WHITE_INDEX = 0; //Tracks position in WHITE_DECK
+var IS_IN_GAME = false;
 
 //Backend declarations
 var selectedCard = undefined;
@@ -34,60 +37,75 @@ var PLAYER_SCORE_TEMPLATE =
   '</div>';
 
 //CAH functions
-
 function initializeGame() {
   loadActiveCards();
-  loadPlayers();
+  bindPlayers();
   bindGameState();
 }
 
 //Snapshot to the game-state collection and run commands when a change happens
 function bindGameState() {
+  
   var query = firebase.firestore()
     .collection('game-state')
   query.onSnapshot(function (snapshot) {
     snapshot.docChanges().forEach(function (change) {
-        if (change.doc.get('state') == 'getStartingCards') {
-          getStartingCards();
-        }
+      console.log('Game state changed to: ' + change.doc.get('state'));
+      if (IS_IN_GAME && change.doc.get('state') == 'bindHand') {
+        bindHand();
+      }
     });
   });
 }
 
 function startGame() {
-  assignCards();
+  var stateQuery = firebase.firestore()
+    .collection('game-state');
+  stateQuery.get().then(function (state) {
+    state.docs[0].ref.set({
+      state: 'init'
+    });
+  });
+  dealStartingHands();
 }
 
-function assignCards() {
+function dealStartingHands() {
   var playerQuery = firebase.firestore()
     .collection('players');
   playerQuery.get().then(function (players) {
     var cardQuery = firebase.firestore()
       .collection('white-cards');
-    cardQuery.get().then(function(cards) {
+    cardQuery.get().then(function (cards) {
+      //Reset any previously assigned cards
+      cards.forEach(function (card) {
+        card.ref.set({
+          text: card.get('text'),
+        });
+      });
+
       //Create a shuffled card order (emulates a deck of cards)
-      var deck = [];
+      WHITE_DECK = [];
       for (var i = 0; i < cards.size; i++) {
-        deck.push(i);
+        WHITE_DECK.push(i);
       }
       for (var i = cards.size - 1; i > 0; i--) {
         var j = Math.floor(Math.random() * (i + 1));
-        var temp = deck[i];
-        deck[i] = deck[j];
-        deck[j] = temp;
+        var temp = WHITE_DECK[i];
+        WHITE_DECK[i] = WHITE_DECK[j];
+        WHITE_DECK[j] = temp;
       }
       //Assign players a number of cards equal to STARTING_HAND_SIZE
-      var deckIndex = 0;
+      WHITE_INDEX = 0;
       players.forEach(function (player) {
         for (var i = 0; i < STARTING_HAND_SIZE; i++) {
-          if (deckIndex > deck.length) {
+          if (WHITE_INDEX > WHITE_DECK.length) {
             console.log("Error: Not enough white cards for all players!");
             break;
           }
-          cards.docs[deck[deckIndex]].ref.set({
+          cards.docs[WHITE_DECK[WHITE_INDEX]].ref.set({
             assignedPlayer: player.get('name')
           }, { merge: true });
-          deckIndex++;
+          WHITE_INDEX++;
         }
       });
     });
@@ -96,20 +114,25 @@ function assignCards() {
     .collection('game-state');
   stateQuery.get().then(function (state) {
     state.docs[0].ref.set({
-      state: 'getStartingCards'
+      state: 'bindHand'
     });
   });
 }
 
-function getStartingCards() {
+//Binds the player's hand to white-cards in firestore where the assignedPlayer field == their username
+function bindHand() {
   var query = firebase.firestore()
     .collection('white-cards')
     .limit(STARTING_HAND_SIZE)
     .where('assignedPlayer', '==', getUserName());
   query.onSnapshot(function (snapshot) {
     snapshot.docChanges().forEach(function (change) {
-      var card = change.doc.data();
-      displayCardInHand(change.doc.id, card.text);
+      if (change.type == 'removed') {
+        removeCardFromUI(change.doc.id);
+      } else {
+        var card = change.doc.data();
+        displayCardInHand(change.doc.id, card.text);
+      }
     });
   });
 }
@@ -135,7 +158,16 @@ function displayCardInHand(id, text) {
   })
 }
 
-function submitCards() {
+function submitCard() {
+  //Remove assignedPlayer value from card
+  var cardQuery = firebase.firestore()
+    .collection('white-cards')
+    .where('text', '==', $(selectedCard).text());
+  cardQuery.get().then(function (cards) {
+    cards.docs[0].ref.set({
+      text: cards.docs[0].get('text')
+    });
+  });
   return firebase.firestore().collection('active-cards').add({
     id: $(selectedCard).attr("id"),
     text: $(selectedCard).text()
@@ -173,11 +205,11 @@ function displayActiveCard(id, text) {
   div.querySelector('.card-text').textContent = text;
 
   $("#" + id).click(function () {
-    $(this).fadeOut(200, function() {
-      firebase.firestore().collection('active-cards').doc(id).delete().then(function() {
-          console.log("Document successfully deleted!");
-      }).catch(function(error) {
-          console.error("Error removing document: ", error);
+    $(this).fadeOut(200, function () {
+      firebase.firestore().collection('active-cards').doc(id).delete().then(function () {
+        console.log("Document successfully deleted!");
+      }).catch(function (error) {
+        console.error("Error removing document: ", error);
       });
     });
   })
@@ -191,7 +223,7 @@ function joinGame() {
   var query = firebase.firestore()
     .collection('players')
     .where('name', '==', getUserName());
-  query.get().then(function(snapshot) {
+  query.get().then(function (snapshot) {
     if (snapshot.size > 0) {
       console.log("Player '" + getUserName() + "' is already in the game.");
       return;
@@ -199,6 +231,7 @@ function joinGame() {
     else {
       $("#join-game").prop("disabled", true);
       $("#join-game").removeClass("waiting");
+      IS_IN_GAME = true;
       return firebase.firestore().collection('players').add({
         name: getUserName(),
         initials: getInitials(),
@@ -217,17 +250,22 @@ function getInitials() {
   return nameArray[0].charAt(0) + nameArray[1].charAt(0);
 }
 
-function loadPlayers() {
+function bindPlayers() {
   var query = firebase.firestore()
     .collection('players')
     .limit(10);
   query.onSnapshot(function (snapshot) {
     snapshot.docChanges().forEach(function (change) {
-      if (change.type == 'removed') {
+      if (change.type == 'removed') { 
+        console.log(change.doc.data().name + ' ' + getUserName());
+        IS_IN_GAME = !(change.doc.data().name == getUserName());
         $("#" + change.doc.id).remove();
         $("#join-game").prop("disabled", false);
         $("#join-game").addClass("waiting");
       } else {
+        if (change.doc.data().name == getUserName()) {
+          IS_IN_GAME = true;
+        }
         var player = change.doc.data();
         displayPlayer(change.doc.id, player.initials, player.score);
       }
@@ -249,11 +287,11 @@ function displayPlayer(id, initials, score) {
   div.querySelector('.score-number').textContent = score.toString();
 
   $("#" + id).click(function () {
-    $(this).fadeOut(200, function() {
-      firebase.firestore().collection('players').doc(id).delete().then(function() {
-          //console.log("Player successfully deleted!");
-      }).catch(function(error) {
-          console.error("Error removing document: ", error);
+    $(this).fadeOut(200, function () {
+      firebase.firestore().collection('players').doc(id).delete().then(function () {
+        //console.log("Player successfully deleted!");
+      }).catch(function (error) {
+        console.error("Error removing document: ", error);
       });
     });
   })
@@ -326,31 +364,6 @@ function loadMessages() {
   });
 }
 
-// Saves the messaging device token to the datastore.
-function saveMessagingDeviceToken() {
-  firebase.messaging().getToken().then(function (currentToken) {
-    if (currentToken) {
-      console.log('Got FCM device token:', currentToken);
-      firebase.firestore().collection('fcmTokens').doc(currentToken)
-        .set({ uid: firebase.auth().currentUser.uid });
-    } else {
-      requestNotificationsPermissions();
-    }
-  }).catch(function (error) {
-    console.error('Unable to get messaging token.', error);
-  });
-}
-
-// Requests permissions to show notifications.
-function requestNotificationsPermissions() {
-  console.log('Requesting notifications permission...');
-  firebase.messaging().requestPermission().then(function () {
-    saveMessagingDeviceToken();
-  }).catch(function (error) {
-    console.error('Unable to get permission to notify.', error);
-  });
-}
-
 // Triggered when the send new message form is submitted.
 function onMessageFormSubmit(e) {
   e.preventDefault();
@@ -378,8 +391,7 @@ function authStateObserver(user) {
     // Hide sign-in button.
     signInButtonElement.setAttribute('hidden', 'true');
 
-    // We save the Firebase Messaging Device token and enable notifications.
-    saveMessagingDeviceToken();
+
   } else { // User is signed out!
     // Hide user's profile and sign-out button.
     signOutButtonElement.setAttribute('hidden', 'true');
@@ -500,7 +512,7 @@ checkSetup();
 var handListElement = document.getElementById('hand-container');
 var responseListElement = document.getElementById('response-container');
 var infoListElement = document.getElementById('info-container');
-var submitCardsElement = document.getElementById('submit-cards');
+var submitCardElement = document.getElementById('submit-card');
 var joinGameElement = document.getElementById('join-game');
 var startGameElement = document.getElementById('start-game');
 
@@ -514,7 +526,7 @@ var signOutButtonElement = document.getElementById('sign-out');
 var signInSnackbarElement = document.getElementById('must-signin-snackbar');
 
 //Listeners
-submitCardsElement.addEventListener('click', submitCards);
+submitCardElement.addEventListener('click', submitCard);
 joinGameElement.addEventListener('click', joinGame);
 startGameElement.addEventListener('click', startGame);
 
