@@ -4,20 +4,26 @@
 var STARTING_HAND_SIZE = 3;
 var WHITE_DECK = [];
 var WHITE_INDEX = 0; //Tracks position in WHITE_DECK
+var TURN_ORDER = [];
+var TURN_INDEX = 0;
 var IS_IN_GAME = false;
 
 //Backend declarations
 var selectedCard = undefined;
 
 $(function () {
+  //checkSetup();
+  //initFirebaseAuth();
   $('#controls-container').hide();
+  $('.host-only').hide();
   if (isUserSignedIn) {
     $('#sign-in-message').hide();
   }
   else {
     $('#controls-container').show();
   }
-  initializeGame();
+  //initializeGame();
+  //loadMessages();
 });
 
 //HTML Templates
@@ -45,6 +51,18 @@ var PLAYER_SCORE_TEMPLATE =
 
 //CAH functions
 function initializeGame() {
+  var query = firebase.firestore()
+    .collection('players')
+    .where('host', '==', true);
+  query.get().then(function(snapshot) {
+    if (snapshot.empty) {
+      $('#host-game').show();
+    }
+    else {
+      $('#host-game').hide();
+    }
+  });
+  
   loadActiveCards();
   bindPlayers();
   bindGameState();
@@ -52,7 +70,6 @@ function initializeGame() {
 
 //Snapshot to the game-state collection and run commands when a change happens
 function bindGameState() {
-
   var query = firebase.firestore()
     .collection('game-state')
   query.onSnapshot(function (snapshot) {
@@ -65,6 +82,18 @@ function bindGameState() {
   });
 }
 
+function hostGame() {
+  var query = firebase.firestore()
+    .collection('players')
+    .where('name', '==', getUserName());
+  query.get().then(function(snapshot) {
+    snapshot.docs[0].ref.set({
+      host: true
+    }, { merge: true });
+  });
+  $('.host-only').show();
+}
+
 function startGame() {
   var stateQuery = firebase.firestore()
     .collection('game-state');
@@ -73,12 +102,14 @@ function startGame() {
       state: 'init'
     });
   });
-  dealStartingHands();
+  startFirstTurn();
+
 }
 
 function endGame() {
   var cardQuery = firebase.firestore()
-    .collection('white-cards');
+    .collection('white-cards')
+    .where('assigned', '==', true);
   cardQuery.get().then(function (cards) {
     //Reset any previously assigned cards
     cards.forEach(function (card) {
@@ -97,7 +128,8 @@ function endGame() {
   });
 }
 
-function dealStartingHands() {
+function startFirstTurn() {
+  //Begin by shuffling the deck and dealing starting hands
   var playerQuery = firebase.firestore()
     .collection('players');
   playerQuery.get().then(function (players) {
@@ -106,9 +138,11 @@ function dealStartingHands() {
     cardQuery.get().then(function (cards) {
       //Reset any previously assigned cards
       cards.forEach(function (card) {
-        card.ref.set({
-          text: card.get('text'),
-        });
+        if (card.get('assignedPlayer') != '') {
+          card.ref.set({
+            text: card.get('text'),
+          });
+        }
       });
 
       //Create a shuffled card order (emulates a deck of cards)
@@ -130,19 +164,26 @@ function dealStartingHands() {
             console.log("Error: Not enough white cards for all players!");
             break;
           }
+          var playerName = player.get('name');
           cards.docs[WHITE_DECK[WHITE_INDEX]].ref.set({
-            assignedPlayer: player.get('name')
+            assigned: true,
+            assignedPlayer: playerName
           }, { merge: true });
           WHITE_INDEX++;
         }
+        //While we have the players in memory, also create the turn order
+        TURN_ORDER.push(playerName);
       });
+      //Randomly select a player to start
+      TURN_INDEX = Math.floor(Math.random() * TURN_ORDER.length);
     });
   });
   var stateQuery = firebase.firestore()
     .collection('game-state');
   stateQuery.get().then(function (state) {
     state.docs[0].ref.set({
-      state: 'bindHand'
+      state: 'bindHand',
+      czar: TURN_ORDER[TURN_INDEX]
     });
   });
 }
@@ -207,7 +248,7 @@ function submitCard() {
 function loadActiveCards() {
   var query = firebase.firestore()
     .collection('active-cards')
-    .limit(10);
+    .limit(12);
   query.onSnapshot(function (snapshot) {
     snapshot.docChanges().forEach(function (change) {
       if (change.type == 'removed') {
@@ -286,16 +327,23 @@ function bindPlayers() {
     .limit(10);
   query.onSnapshot(function (snapshot) {
     snapshot.docChanges().forEach(function (change) {
+      var player = change.doc.data();
       if (change.type == 'removed') {
-        IS_IN_GAME = !(change.doc.data().name == getUserName());
+        IS_IN_GAME = !(player.name == getUserName());
         $("#" + change.doc.id).remove();
         $("#join-game").prop("disabled", false);
         $("#join-game").addClass("waiting");
       } else {
-        if (change.doc.data().name == getUserName()) {
+        if (player.name == getUserName()) {
           IS_IN_GAME = true;
         }
-        var player = change.doc.data();
+        if (player.host == true) {
+          $('#host-game').hide();
+        }
+        if (player.name == getUserName() && player.host == true) {
+          $('.host-only').show();
+        }
+        
         displayPlayer(change.doc.id, player.initials, player.score);
       }
     });
@@ -536,14 +584,12 @@ function checkSetup() {
   }
 }
 
-// Checks that Firebase has been imported.
-checkSetup();
-
 // Shortcuts to DOM Elements.
 var handListElement = document.getElementById('hand-container');
 var responseListElement = document.getElementById('response-container');
 var infoListElement = document.getElementById('info-container');
 var submitCardElement = document.getElementById('submit-card');
+var hostGameElement = document.getElementById('host-game');
 var joinGameElement = document.getElementById('join-game');
 var startGameElement = document.getElementById('start-game');
 var endGameElement = document.getElementById('end-game');
@@ -559,6 +605,7 @@ var signInSnackbarElement = document.getElementById('must-signin-snackbar');
 
 //Listeners
 submitCardElement.addEventListener('click', submitCard);
+hostGameElement.addEventListener('click', hostGame);
 joinGameElement.addEventListener('click', joinGame);
 startGameElement.addEventListener('click', startGame);
 endGameElement.addEventListener('click', endGame);
@@ -573,7 +620,7 @@ messageInputElement.addEventListener('keyup', toggleButton);
 messageInputElement.addEventListener('change', toggleButton);
 
 // initialize Firebase
-initFirebaseAuth();
+
 
 // Remove the warning about timstamps change. 
 var firestore = firebase.firestore();
@@ -583,4 +630,4 @@ firestore.settings(settings);
 // TODO: Enable Firebase Performance Monitoring.
 
 // We load currently existing chat messages and listen to new ones.
-loadMessages();
+
