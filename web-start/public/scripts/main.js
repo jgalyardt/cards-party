@@ -10,6 +10,13 @@ var IS_IN_GAME = false;
 var selectedCard = undefined;
 
 $(function () {
+  $('#controls-container').hide();
+  if (isUserSignedIn) {
+    $('#sign-in-message').hide();
+  }
+  else {
+    $('#controls-container').show();
+  }
   initializeGame();
 });
 
@@ -45,7 +52,7 @@ function initializeGame() {
 
 //Snapshot to the game-state collection and run commands when a change happens
 function bindGameState() {
-  
+
   var query = firebase.firestore()
     .collection('game-state')
   query.onSnapshot(function (snapshot) {
@@ -67,6 +74,27 @@ function startGame() {
     });
   });
   dealStartingHands();
+}
+
+function endGame() {
+  var cardQuery = firebase.firestore()
+    .collection('white-cards');
+  cardQuery.get().then(function (cards) {
+    //Reset any previously assigned cards
+    cards.forEach(function (card) {
+      card.ref.set({
+        text: card.get('text'),
+      });
+    });
+  });
+  var cardQuery = firebase.firestore()
+    .collection('active-cards');
+  cardQuery.get().then(function (cards) {
+    //Delete all active cards
+    cards.forEach(function (card) {
+      card.ref.delete();
+    });
+  });
 }
 
 function dealStartingHands() {
@@ -225,6 +253,8 @@ function joinGame() {
     .where('name', '==', getUserName());
   query.get().then(function (snapshot) {
     if (snapshot.size > 0) {
+      $("#join-game").prop("disabled", true);
+      $("#join-game").removeClass("waiting");
       console.log("Player '" + getUserName() + "' is already in the game.");
       return;
     }
@@ -256,8 +286,7 @@ function bindPlayers() {
     .limit(10);
   query.onSnapshot(function (snapshot) {
     snapshot.docChanges().forEach(function (change) {
-      if (change.type == 'removed') { 
-        console.log(change.doc.data().name + ' ' + getUserName());
+      if (change.type == 'removed') {
         IS_IN_GAME = !(change.doc.data().name == getUserName());
         $("#" + change.doc.id).remove();
         $("#join-game").prop("disabled", false);
@@ -325,6 +354,9 @@ function getProfilePicUrl() {
 
 // Returns the signed-in user's display name.
 function getUserName() {
+  if (!isUserSignedIn()) {
+    return 'ERR_PLAYER_NOT_SIGNED_IN';
+  }
   return firebase.auth().currentUser.displayName;
 }
 
@@ -380,11 +412,8 @@ function onMessageFormSubmit(e) {
 // Triggers when the auth state change for instance when the user signs-in or signs-out.
 function authStateObserver(user) {
   if (user) { // User is signed in!
-    // Get the signed-in user's profile pic and name.
-    var userName = getUserName();
-
-
-
+    $('#sign-in-message').hide();
+    $('#controls-container').show();
     // Show user's profile and sign-out button.
     signOutButtonElement.removeAttribute('hidden');
 
@@ -393,6 +422,8 @@ function authStateObserver(user) {
 
 
   } else { // User is signed out!
+    $('#controls-container').hide();
+    $('#sign-in-message').show();
     // Hide user's profile and sign-out button.
     signOutButtonElement.setAttribute('hidden', 'true');
 
@@ -515,6 +546,7 @@ var infoListElement = document.getElementById('info-container');
 var submitCardElement = document.getElementById('submit-card');
 var joinGameElement = document.getElementById('join-game');
 var startGameElement = document.getElementById('start-game');
+var endGameElement = document.getElementById('end-game');
 
 var messageListElement = document.getElementById('messages');
 var messageFormElement = document.getElementById('message-form');
@@ -529,6 +561,7 @@ var signInSnackbarElement = document.getElementById('must-signin-snackbar');
 submitCardElement.addEventListener('click', submitCard);
 joinGameElement.addEventListener('click', joinGame);
 startGameElement.addEventListener('click', startGame);
+endGameElement.addEventListener('click', endGame);
 
 // Saves message on form submit.
 messageFormElement.addEventListener('submit', onMessageFormSubmit);

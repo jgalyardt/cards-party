@@ -17,3 +17,9 @@ function resetWhiteCards(deckSize = 20) {
     }
   });
 }
+
+function resetJoinGame() {
+  $("#join-game").prop("disabled", false);
+  $("#join-game").addClass("waiting");
+  return 'Reset join button';
+}

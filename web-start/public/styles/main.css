@@ -36,6 +36,11 @@ body {
   to {color: lime;}
 }
 
+#sign-in-message {
+  color: red;
+  font-size: 22px;
+}
+
 .score-panel {
   font-size: 16px;
   background-color: white;
