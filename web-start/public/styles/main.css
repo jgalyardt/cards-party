@@ -98,6 +98,14 @@ body {
   border: 1px solid red;
 }
 
+.white-card-square.selected {
+  border: 1px solid lime;
+}
+
+.score-panel.czar {
+  border: 1px solid gold;
+}
+
 #game-container {
   height: 55vh;
 }

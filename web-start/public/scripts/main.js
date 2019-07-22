@@ -7,13 +7,12 @@ var WHITE_INDEX = 0; //Tracks position in WHITE_DECK
 var NUM_PLAYERS = 0;
 var TURN_INDEX = 0;
 var IS_IN_GAME = false;
+var SELECTED_CARD = undefined;
 
-//Backend declarations
-var selectedCard = undefined;
-
+checkSetup();
+initFirebaseAuth();
 $(function () {
-  //checkSetup();
-  //initFirebaseAuth();
+
   $('#controls-container').hide();
   $('.host-only').hide();
   if (isUserSignedIn) {
@@ -22,8 +21,8 @@ $(function () {
   else {
     $('#controls-container').show();
   }
-  //initializeGame();
-  //loadMessages();
+  initializeGame();
+  loadMessages();
 });
 
 //HTML Templates
@@ -54,7 +53,7 @@ function initializeGame() {
   var query = firebase.firestore()
     .collection('players')
     .where('host', '==', true);
-  query.get().then(function(snapshot) {
+  query.get().then(function (snapshot) {
     if (snapshot.empty) {
       $('#host-game').show();
     }
@@ -62,7 +61,6 @@ function initializeGame() {
       $('#host-game').hide();
     }
   });
-  
   loadActiveCards();
   bindPlayers();
   bindGameState();
@@ -75,7 +73,12 @@ function bindGameState() {
   query.onSnapshot(function (snapshot) {
     snapshot.docChanges().forEach(function (change) {
       console.log('Game state changed to: ' + change.doc.get('state'));
-      if (IS_IN_GAME && change.doc.get('state') == 'bindHand') {
+      if (!IS_IN_GAME && change.doc.get('state') == 'gameReady') {
+        //Make the join-game button start flashing
+        $("#join-game").prop("disabled", false);
+        $("#join-game").addClass("waiting");
+      }
+      else if (IS_IN_GAME && change.doc.get('state') == 'bindHand') {
         bindHand();
       }
     });
@@ -86,12 +89,20 @@ function hostGame() {
   var query = firebase.firestore()
     .collection('players')
     .where('name', '==', getUserName());
-  query.get().then(function(snapshot) {
+  query.get().then(function (snapshot) {
     snapshot.docs[0].ref.set({
       host: true
     }, { merge: true });
   });
+  var stateQuery = firebase.firestore()
+    .collection('game-state');
+  stateQuery.get().then(function (state) {
+    state.docs[0].ref.set({
+      state: 'gameReady'
+    });
+  });
   $('.host-only').show();
+  $('#host-game').hide();
 }
 
 function startGame() {
@@ -136,7 +147,7 @@ function startFirstTurn() {
     var cardQuery = firebase.firestore()
       .collection('white-cards');
     cardQuery.get().then(function (cards) {
-      
+
       //NOTE: This commented out code may be redundant if endGame() is always called,
       //which would decrease the number of reads needed per game
 
@@ -221,11 +232,11 @@ function displayCardInHand(id, text) {
   div.querySelector('.card-text').textContent = text;
 
   $("#" + id).click(function () {
-    if (selectedCard != null) {
-      selectedCard.removeClass("selected");
+    if (SELECTED_CARD != null) {
+      SELECTED_CARD.removeClass("selected");
     }
     $(this).addClass("selected");
-    selectedCard = $(this);
+    SELECTED_CARD = $(this);
   })
 }
 
@@ -233,15 +244,17 @@ function submitCard() {
   //Remove assignedPlayer value from card
   var cardQuery = firebase.firestore()
     .collection('white-cards')
-    .where('text', '==', $(selectedCard).text());
+    .where('text', '==', $(SELECTED_CARD).text());
   cardQuery.get().then(function (cards) {
     cards.docs[0].ref.set({
       text: cards.docs[0].get('text')
     });
   });
   return firebase.firestore().collection('active-cards').add({
-    id: $(selectedCard).attr("id"),
-    text: $(selectedCard).text()
+    id: $(SELECTED_CARD).attr("id"),
+    text: $(SELECTED_CARD).text(),
+    player: getUserName(),
+    selected: false
   }).catch(function (error) {
     console.error('Error writing new message to Firebase Database', error);
   });
@@ -257,13 +270,13 @@ function loadActiveCards() {
         removeCardFromUI(change.doc.id);
       } else {
         var card = change.doc.data();
-        displayActiveCard(change.doc.id, card.text);
+        displayActiveCard(change.doc.id, card.text, card.selected);
       }
     });
   });
 }
 
-function displayActiveCard(id, text) {
+function displayActiveCard(id, text, selected) {
   var div = document.getElementById(id);
   // If an element for that message does not exists yet we create it.
   if (!div) {
@@ -275,40 +288,64 @@ function displayActiveCard(id, text) {
   }
   div.querySelector('.card-text').textContent = text;
 
+  if (selected) {
+    $("#" + id).addClass('selected');
+    // $("#" + id).fadeOut(2000, function () {
+    //   firebase.firestore().collection('active-cards').doc(id).delete().then(function () {
+    //     console.log("Active card successfully deleted!");
+    //   }).catch(function (error) {
+    //     console.error("Error removing active card: ", error);
+    //   });
+    // });
+  }
+
   $("#" + id).click(function () {
-    $(this).fadeOut(200, function () {
-      firebase.firestore().collection('active-cards').doc(id).delete().then(function () {
-        console.log("Document successfully deleted!");
-      }).catch(function (error) {
-        console.error("Error removing document: ", error);
-      });
+    firebase.firestore().collection('active-cards').doc(id).get().then(function (card) {
+      card.ref.set({
+        selected: true
+      }, { merge: true });
+    }).catch(function (error) {
+      console.error("Error updating document: ", error);
     });
-  })
+    // console.log("Test")
+    // //If this card has been selected, delete all other active cards
+    // var query = firebase.firestore()
+    //   .collection('active-cards')
+    //   .where('selected', '==', 'false');
+    // query.get().then(function (snapshot) {
+    //   console.log("snapshot: " + snapshot);
+    //   snapshot.forEach(function (card) {
+    //     console.log(card);
+    //     card.ref.delete();
+    //   });
+    // });
+  });
 }
 
 function removeCardFromUI(id) {
-  $("#" + id).parent().remove();
+  $("#" + id).parent().fadeOut(2000, function () {
+    $(this).remove();
+  });
 }
 
 function joinGame() {
+  $("#join-game").prop("disabled", true);
+  $("#join-game").removeClass("waiting");
   var query = firebase.firestore()
     .collection('players')
     .where('name', '==', getUserName());
   query.get().then(function (snapshot) {
     if (snapshot.size > 0) {
-      $("#join-game").prop("disabled", true);
-      $("#join-game").removeClass("waiting");
       console.log("Player '" + getUserName() + "' is already in the game.");
       return;
     }
     else {
-      $("#join-game").prop("disabled", true);
-      $("#join-game").removeClass("waiting");
       IS_IN_GAME = true;
       return firebase.firestore().collection('players').add({
         name: getUserName(),
         initials: getInitials(),
-        score: 0
+        score: 0,
+        czar: false
       }).catch(function (error) {
         console.error('Error writing new message to Firebase Database', error);
       });
@@ -333,11 +370,11 @@ function bindPlayers() {
       if (change.type == 'removed') {
         IS_IN_GAME = !(player.name == getUserName());
         $("#" + change.doc.id).remove();
-        $("#join-game").prop("disabled", false);
-        $("#join-game").addClass("waiting");
       } else {
         if (player.name == getUserName()) {
           IS_IN_GAME = true;
+          submitCardElement.setAttribute('disabled',
+            player.czar ? 'true' : 'false');
         }
         if (player.host == true) {
           $('#host-game').hide();
@@ -345,14 +382,14 @@ function bindPlayers() {
         if (player.name == getUserName() && player.host == true) {
           $('.host-only').show();
         }
-        
-        displayPlayer(change.doc.id, player.initials, player.score);
+
+        displayPlayer(change.doc.id, player.initials, player.score, player.czar);
       }
     });
   });
 }
 
-function displayPlayer(id, initials, score) {
+function displayPlayer(id, initials, score, czar) {
   var div = document.getElementById(id);
   // If an element for that message does not exists yet we create it.
   if (!div) {
@@ -364,6 +401,9 @@ function displayPlayer(id, initials, score) {
   }
   div.querySelector('.score-initials').textContent = initials + ':';
   div.querySelector('.score-number').textContent = score.toString();
+  if (czar) {
+    $("#" + id).addClass('czar');
+  }
 
   $("#" + id).click(function () {
     $(this).fadeOut(200, function () {
@@ -382,9 +422,6 @@ function displayPlayer(id, initials, score) {
 function signIn() {
   var provider = new firebase.auth.GoogleAuthProvider();
   firebase.auth().signInWithPopup(provider);
-  //Make the join-game button start flashing
-  $("#join-game").prop("disabled", false);
-  $("#join-game").addClass("waiting");
 }
 
 // Signs-out of Friendly Chat.
