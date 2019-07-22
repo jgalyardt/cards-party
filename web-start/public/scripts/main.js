@@ -6,6 +6,7 @@ var WHITE_DECK = [];
 var WHITE_INDEX = 0; //Tracks position in WHITE_DECK
 var NUM_PLAYERS = 0;
 var TURN_INDEX = 0;
+var MAX_SCORE = 8;
 var IS_IN_GAME = false;
 var SELECTED_CARD = undefined;
 
@@ -72,14 +73,62 @@ function bindGameState() {
     .collection('game-state')
   query.onSnapshot(function (snapshot) {
     snapshot.docChanges().forEach(function (change) {
-      console.log('Game state changed to: ' + change.doc.get('state'));
-      if (!IS_IN_GAME && change.doc.get('state') == 'gameReady') {
+      var data = change.doc.data();
+      console.log('Game state changed to: ' + data.state);
+      if (!IS_IN_GAME && data.state == 'gameReady') {
         //Make the join-game button start flashing
         $("#join-game").prop("disabled", false);
         $("#join-game").addClass("waiting");
       }
-      else if (IS_IN_GAME && change.doc.get('state') == 'bindHand') {
+      else if (IS_IN_GAME && data.state == 'bindHand') {
         bindHand();
+      }
+      else if (data.state == 'endRound') {
+        $("#" + data.cardID).addClass('selected');
+        
+        //Only the czar needs to run all these queries
+        if (getUserName() == data.czar) {
+          //If this card has been selected, delete all other active cards
+          var query = firebase.firestore()
+            .collection('active-cards')
+            .where('selected', '==', false);
+          query.get().then(function (snapshot) {
+            snapshot.forEach(function (card) {
+              console.log(card);
+              card.ref.delete();
+            });
+          });
+
+          //Add one to the winning player's score
+          var query = firebase.firestore()
+            .collection('players')
+            .where('name', '==', data.winner);
+          query.get().then(function (snapshot) {
+            snapshot.docs[0].ref.set({
+              score: 1
+            }, { merge: true });
+          });
+
+          //Remove the current czar
+          var query = firebase.firestore()
+            .collection('players')
+            .where('name', '==', getUserName());
+          query.get().then(function (snapshot) {
+            snapshot.docs[0].ref.set({
+              czar: false
+            }, { merge: true });
+          });
+
+          //Pick the next card czar
+          TURN_INDEX = TURN_INDEX == (NUM_PLAYERS - 1) ? 0 : TURN_INDEX + 1;
+          firebase.firestore().collection('players').get().then(function (players) {
+            players.docs[TURN_INDEX].ref.set({
+              czar: true
+            }, { merge: true });
+          });
+
+          //TODO: Deal new hands
+        }
       }
     });
   });
@@ -94,9 +143,7 @@ function hostGame() {
       host: true
     }, { merge: true });
   });
-  var stateQuery = firebase.firestore()
-    .collection('game-state');
-  stateQuery.get().then(function (state) {
+  firebase.firestore().collection('game-state').get().then(function (state) {
     state.docs[0].ref.set({
       state: 'gameReady'
     });
@@ -106,9 +153,7 @@ function hostGame() {
 }
 
 function startGame() {
-  var stateQuery = firebase.firestore()
-    .collection('game-state');
-  stateQuery.get().then(function (state) {
+  firebase.firestore().collection('game-state').get().then(function (state) {
     state.docs[0].ref.set({
       state: 'init'
     });
@@ -143,7 +188,6 @@ function startFirstTurn() {
   var playerQuery = firebase.firestore()
     .collection('players');
   playerQuery.get().then(function (players) {
-    NUM_PLAYERS = players.size;
     var cardQuery = firebase.firestore()
       .collection('white-cards');
     cardQuery.get().then(function (cards) {
@@ -192,9 +236,7 @@ function startFirstTurn() {
       }, { merge: true });
     });
   });
-  var stateQuery = firebase.firestore()
-    .collection('game-state');
-  stateQuery.get().then(function (state) {
+  firebase.firestore().collection('game-state').get().then(function (state) {
     state.docs[0].ref.set({
       state: 'bindHand'
     });
@@ -270,13 +312,13 @@ function loadActiveCards() {
         removeCardFromUI(change.doc.id);
       } else {
         var card = change.doc.data();
-        displayActiveCard(change.doc.id, card.text, card.selected);
+        displayActiveCard(change.doc.id, card.text, card.player, card.selected);
       }
     });
   });
 }
 
-function displayActiveCard(id, text, selected) {
+function displayActiveCard(id, text, player, selected) {
   var div = document.getElementById(id);
   // If an element for that message does not exists yet we create it.
   if (!div) {
@@ -289,37 +331,26 @@ function displayActiveCard(id, text, selected) {
   div.querySelector('.card-text').textContent = text;
 
   if (selected) {
-    $("#" + id).addClass('selected');
-    // $("#" + id).fadeOut(2000, function () {
-    //   firebase.firestore().collection('active-cards').doc(id).delete().then(function () {
-    //     console.log("Active card successfully deleted!");
-    //   }).catch(function (error) {
-    //     console.error("Error removing active card: ", error);
-    //   });
-    // });
-  }
-
-  $("#" + id).click(function () {
-    firebase.firestore().collection('active-cards').doc(id).get().then(function (card) {
-      card.ref.set({
-        selected: true
-      }, { merge: true });
-    }).catch(function (error) {
-      console.error("Error updating document: ", error);
+    firebase.firestore().collection('game-state').get().then(function (state) {
+      state.docs[0].ref.set({
+        state: 'endRound',
+        czar: getUserName(),
+        winner: player,
+        cardID: id
+      });
     });
-    // console.log("Test")
-    // //If this card has been selected, delete all other active cards
-    // var query = firebase.firestore()
-    //   .collection('active-cards')
-    //   .where('selected', '==', 'false');
-    // query.get().then(function (snapshot) {
-    //   console.log("snapshot: " + snapshot);
-    //   snapshot.forEach(function (card) {
-    //     console.log(card);
-    //     card.ref.delete();
-    //   });
-    // });
-  });
+  }
+  else {
+    $("#" + id).click(function () {
+      firebase.firestore().collection('active-cards').doc(id).get().then(function (card) {
+        card.ref.set({
+          selected: true
+        }, { merge: true });
+      }).catch(function (error) {
+        console.error("Error updating document: ", error);
+      });
+    });
+  }
 }
 
 function removeCardFromUI(id) {
@@ -365,12 +396,22 @@ function bindPlayers() {
     .collection('players')
     .limit(10);
   query.onSnapshot(function (snapshot) {
+    NUM_PLAYERS = snapshot.size;
     snapshot.docChanges().forEach(function (change) {
       var player = change.doc.data();
       if (change.type == 'removed') {
         IS_IN_GAME = !(player.name == getUserName());
         $("#" + change.doc.id).remove();
-      } else {
+      }
+      else if (player.score == MAX_SCORE) {
+        firebase.firestore().collection('game-state').get().then(function (state) {
+          state.docs[0].ref.set({
+            state: 'gameOver',
+            winner: player.name
+          });
+        });
+      }
+      else {
         if (player.name == getUserName()) {
           IS_IN_GAME = true;
           submitCardElement.setAttribute('disabled',
