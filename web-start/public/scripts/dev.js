@@ -1,4 +1,4 @@
-//Dev functions for firebase
+//Dev functions for debug purposes
 
 function resetWhiteCards(deckSize = 20) {
   var collectionRef = firebase.firestore().collection('white-cards');

@@ -184,6 +184,11 @@ function endGame() {
 }
 
 function startFirstTurn() {
+
+  //Get a random black card
+  
+
+  //FOLLOWING CODE APPLIES TO ORIGINAL CAH RULES
   //Begin by shuffling the deck and dealing starting hands
   var playerQuery = firebase.firestore()
     .collection('players');
@@ -191,17 +196,6 @@ function startFirstTurn() {
     var cardQuery = firebase.firestore()
       .collection('white-cards');
     cardQuery.get().then(function (cards) {
-
-      //NOTE: This commented out code may be redundant if endGame() is always called,
-      //which would decrease the number of reads needed per game
-
-      //Reset any previously assigned cards
-      // cards.forEach(function (card) { 
-      //   card.ref.set({
-      //     text: card.get('text'),
-      //   });
-      // });
-
       //Create a shuffled card order (emulates a deck of cards)
       WHITE_DECK = [];
       for (var i = 0; i < cards.size; i++) {
