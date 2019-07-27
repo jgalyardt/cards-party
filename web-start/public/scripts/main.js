@@ -9,6 +9,7 @@ var TURN_INDEX = 0;
 var MAX_SCORE = 8;
 var IS_IN_GAME = false;
 var SELECTED_CARD = undefined;
+var CARDS = undefined;
 
 checkSetup();
 initFirebaseAuth();
@@ -158,7 +159,8 @@ function startGame() {
       state: 'init'
     });
   });
-  startFirstTurn();
+  CARDS = fetchJSON('base.json');
+  startFirstTurn('all-blank');
 }
 
 function endGame() {
@@ -186,9 +188,11 @@ function endGame() {
 function startFirstTurn(gameMode) {
 
   //Get a random black card
+  var blackCard = CARDS['blackCards'][Math.floor(Math.random() * CARDS['blackCards'].length)];
 
   if (gameMode == 'all-blank') {
-
+    $('#black-text').text(blackCard['text']);
+    
   }
   else if (gameMode == 'classic') {
     //FOLLOWING CODE APPLIES TO ORIGINAL CAH RULES

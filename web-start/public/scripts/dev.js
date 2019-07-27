@@ -24,13 +24,13 @@ function resetJoinGame() {
   return 'Reset join button';
 }
 
-function addCardSet(setName) {
+function fetchJSON(setName) {
   var json = (function () {
     var json = null;
     $.ajax({
       'async': false,
       'global': false,
-      'url': "cards/" + setName + ".json",
+      'url': "cards/" + setName,
       'dataType': "json",
       'success': function (data) {
         json = data;
@@ -38,5 +38,5 @@ function addCardSet(setName) {
     });
     return json;
   })();
-  console.log(json);
+  return json;
 }
