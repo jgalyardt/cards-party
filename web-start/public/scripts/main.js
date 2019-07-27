@@ -22,8 +22,8 @@ $(function () {
   else {
     $('#controls-container').show();
   }
-  initializeGame();
-  loadMessages();
+  // initializeGame();
+  // loadMessages();
 });
 
 //HTML Templates
@@ -85,7 +85,7 @@ function bindGameState() {
       }
       else if (data.state == 'endRound') {
         $("#" + data.cardID).addClass('selected');
-        
+
         //Only the czar needs to run all these queries
         if (getUserName() == data.czar) {
           //If this card has been selected, delete all other active cards
@@ -183,53 +183,58 @@ function endGame() {
   });
 }
 
-function startFirstTurn() {
+function startFirstTurn(gameMode) {
 
   //Get a random black card
-  
 
-  //FOLLOWING CODE APPLIES TO ORIGINAL CAH RULES
-  //Begin by shuffling the deck and dealing starting hands
-  var playerQuery = firebase.firestore()
-    .collection('players');
-  playerQuery.get().then(function (players) {
-    var cardQuery = firebase.firestore()
-      .collection('white-cards');
-    cardQuery.get().then(function (cards) {
-      //Create a shuffled card order (emulates a deck of cards)
-      WHITE_DECK = [];
-      for (var i = 0; i < cards.size; i++) {
-        WHITE_DECK.push(i);
-      }
-      for (var i = cards.size - 1; i > 0; i--) {
-        var j = Math.floor(Math.random() * (i + 1));
-        var temp = WHITE_DECK[i];
-        WHITE_DECK[i] = WHITE_DECK[j];
-        WHITE_DECK[j] = temp;
-      }
-      //Assign players a number of cards equal to STARTING_HAND_SIZE
-      WHITE_INDEX = 0;
-      players.forEach(function (player) {
-        for (var i = 0; i < STARTING_HAND_SIZE; i++) {
-          if (WHITE_INDEX > WHITE_DECK.length) {
-            console.log("Error: Not enough white cards for all players!");
-            break;
-          }
-          var playerName = player.get('name');
-          cards.docs[WHITE_DECK[WHITE_INDEX]].ref.set({
-            assigned: true,
-            assignedPlayer: playerName
-          }, { merge: true });
-          WHITE_INDEX++;
+  if (gameMode == 'all-blank') {
+
+  }
+  else if (gameMode == 'classic') {
+    //FOLLOWING CODE APPLIES TO ORIGINAL CAH RULES
+    //Begin by shuffling the deck and dealing starting hands
+    var playerQuery = firebase.firestore()
+      .collection('players');
+    playerQuery.get().then(function (players) {
+      var cardQuery = firebase.firestore()
+        .collection('white-cards');
+      cardQuery.get().then(function (cards) {
+        //Create a shuffled card order (emulates a deck of cards)
+        WHITE_DECK = [];
+        for (var i = 0; i < cards.size; i++) {
+          WHITE_DECK.push(i);
         }
+        for (var i = cards.size - 1; i > 0; i--) {
+          var j = Math.floor(Math.random() * (i + 1));
+          var temp = WHITE_DECK[i];
+          WHITE_DECK[i] = WHITE_DECK[j];
+          WHITE_DECK[j] = temp;
+        }
+        //Assign players a number of cards equal to STARTING_HAND_SIZE
+        WHITE_INDEX = 0;
+        players.forEach(function (player) {
+          for (var i = 0; i < STARTING_HAND_SIZE; i++) {
+            if (WHITE_INDEX > WHITE_DECK.length) {
+              console.log("Error: Not enough white cards for all players!");
+              break;
+            }
+            var playerName = player.get('name');
+            cards.docs[WHITE_DECK[WHITE_INDEX]].ref.set({
+              assigned: true,
+              assignedPlayer: playerName
+            }, { merge: true });
+            WHITE_INDEX++;
+          }
+        });
+        //Randomly select a player to start
+        TURN_INDEX = Math.floor(Math.random() * NUM_PLAYERS);
+        players.docs[TURN_INDEX].ref.set({
+          czar: true
+        }, { merge: true });
       });
-      //Randomly select a player to start
-      TURN_INDEX = Math.floor(Math.random() * NUM_PLAYERS);
-      players.docs[TURN_INDEX].ref.set({
-        czar: true
-      }, { merge: true });
     });
-  });
+  }
+
   firebase.firestore().collection('game-state').get().then(function (state) {
     state.docs[0].ref.set({
       state: 'bindHand'
