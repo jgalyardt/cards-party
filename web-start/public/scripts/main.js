@@ -1,25 +1,26 @@
 'use strict';
 
 //Game setup variables
-var STARTING_HAND_SIZE = 3;
+var STARTING_HAND_SIZE = 1;
 var WHITE_DECK = [];
 var WHITE_INDEX = 0; //Tracks position in WHITE_DECK
 var NUM_PLAYERS = 0;
 var TURN_INDEX = 0;
 var MAX_SCORE = 8;
+var IS_HOST = false;
 var IS_IN_GAME = false;
 var SELECTED_CARD = undefined;
 var CARDS = undefined;
 
-String.prototype.hashCode = function() {
+String.prototype.hashCode = function () {
   var hash = 0;
   if (this.length == 0) {
-      return hash;
+    return hash;
   }
   for (var i = 0; i < this.length; i++) {
-      var char = this.charCodeAt(i);
-      hash = ((hash<<5)-hash)+char;
-      hash = hash & hash; // Convert to 32bit integer
+    var char = this.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32bit integer
   }
   return hash;
 }
@@ -37,7 +38,7 @@ $(function () {
     $('#controls-container').show();
   }
   initializeGame();
-  // loadMessages();
+  loadMessages();
 });
 
 //HTML Templates
@@ -72,17 +73,20 @@ var PLAYER_SCORE_TEMPLATE =
 function initializeGame() {
   var query = firebase.firestore()
     .collection('players')
-    .where('host', '==', true);
+    .where('host', '==', true)
+    .where('name', '==', getUserName());
   query.get().then(function (snapshot) {
     if (snapshot.empty) {
       $('#host-game').show();
     }
     else {
+      IS_HOST = true;
       $('#host-game').hide();
     }
   });
   loadActiveCards();
   bindPlayers();
+  bindHand('all-blank');
   bindGameState();
 }
 
@@ -108,18 +112,20 @@ function bindGameState() {
         //Make the join-game button start flashing
         $("#join-game").prop("disabled", false);
         $("#join-game").addClass("waiting");
+        $("#host-game").hide();
       }
       else if (IS_IN_GAME && data.state == 'bindHand') {
-        if (data.mode == 'all-blank') {
-          bindHand('all-blank');
-        }
+        // if (data.mode == 'all-blank') {
+        //   bindHand('all-blank');
+        // }
       }
       else if (data.state == 'endRound') {
-        
+
         $("#" + data.cardID).addClass('selected');
         $('.czar').removeClass('czar');
-        //Only the czar needs to run all these queries
-        if (getUserName() == data.czar) {
+        $(submitCardElement).prop('disabled', false);
+        //Only the host needs to run all these queries
+        if (IS_HOST) {
           //If this card has been selected, delete all other active cards
           var query = firebase.firestore()
             .collection('active-cards')
@@ -143,7 +149,7 @@ function bindGameState() {
           //Remove the current czar
           var query = firebase.firestore()
             .collection('players')
-            .where('name', '==', getUserName());
+            .where('czar', '==', true);
           query.get().then(function (snapshot) {
             snapshot.docs[0].ref.set({
               czar: false
@@ -158,25 +164,27 @@ function bindGameState() {
             }, { merge: true });
           });
 
-          //TODO: Deal new hands
-        }
-        displayCardInHand('blank' + (Math.random().toString()).hashCode(), '');
+          //Set a new black card
+          newBlackCard();
 
+          change.doc.ref.set({
+            state: 'idle'
+          });
+        }
+
+      }
+      else if (data.state == 'endGame') {
+        $('.hand-container').children().each(function () {
+          $(this).remove();
+        });
       }
     });
   });
 }
 
 function hostGame() {
+  IS_HOST = true;
   CARDS = fetchJSON('base.json');
-  var query = firebase.firestore()
-    .collection('players')
-    .where('name', '==', getUserName());
-  query.get().then(function (snapshot) {
-    snapshot.docs[0].ref.set({
-      host: true
-    }, { merge: true });
-  });
   firebase.firestore().collection('game-state').get().then(function (state) {
     state.docs[0].ref.set({
       state: 'gameReady'
@@ -195,11 +203,26 @@ function startGame() {
   startFirstTurn('all-blank');
 }
 
-function endGame() {
-  
-  for (var i = 0; i < STARTING_HAND_SIZE; i++) {
-    $('#blankCardInHand' + i.toString()).remove();
+function newBlackCard() {
+  var blackCard = CARDS['blackCards'][Math.floor(Math.random() * CARDS['blackCards'].length)];
+  while (blackCard['pick'] != 1) {
+    blackCard = CARDS['blackCards'][Math.floor(Math.random() * CARDS['blackCards'].length)];
   }
+
+  firebase.firestore().collection('black-card').get().then(function (card) {
+    card.docs[0].ref.set({
+      text: blackCard['text']
+    });
+  });
+}
+
+function endGame() {
+  firebase.firestore().collection('game-state').get().then(function (state) {
+    state.docs[0].ref.set({
+      state: 'endGame'
+    });
+  });
+
   var cardQuery = firebase.firestore()
     .collection('white-cards')
     .where('assigned', '==', true);
@@ -234,16 +257,7 @@ function endGame() {
 
 function startFirstTurn(gameMode) {
 
-  //Get a random black card
-  var blackCard = CARDS['blackCards'][Math.floor(Math.random() * CARDS['blackCards'].length)];
-
-  firebase.firestore().collection('black-card').get().then(function (card) {
-    card.docs[0].ref.set({
-      text: blackCard['text']
-    });
-  });
-
-  
+  newBlackCard();
 
   if (gameMode == 'all-blank') {
     firebase.firestore().collection('game-state').get().then(function (state) {
@@ -352,8 +366,8 @@ function displayCardInHand(id, text) {
   }
   if (text != '') {
     div.querySelector('.card-text').textContent = text;
-  } 
-  
+  }
+
 
   $("#" + id).click(function () {
     if (SELECTED_CARD != null) {
@@ -385,6 +399,8 @@ function submitCard() {
     console.error('Error writing new message to Firebase Database', error);
   });
   $(SELECTED_CARD).parent().remove();
+  displayCardInHand('blank' + (Math.random().toString()).hashCode(), '');
+  $(submitCardElement).prop('disabled', true);
 }
 
 function loadActiveCards() {
@@ -415,27 +431,38 @@ function displayActiveCard(id, text, player, selected) {
   }
   div.querySelector('.card-text').textContent = text;
 
-  if (selected) {
-    firebase.firestore().collection('game-state').get().then(function (state) {
-      state.docs[0].ref.set({
-        state: 'endRound',
-        czar: getUserName(),
-        winner: player,
-        cardID: id
-      });
+
+  $("#" + id).click(function () {
+
+
+
+    var query = firebase.firestore()
+      .collection('players')
+      .where('czar', '==', true)
+      .where('name', '==', getUserName());
+    query.get().then(function (snapshot) {
+      if ($('#response-container').children().length == NUM_PLAYERS - 1) {
+        if (snapshot.size > 0) {
+          firebase.firestore().collection('active-cards').doc(id).get().then(function (card) {
+            card.ref.set({
+              selected: true
+            }, { merge: true });
+          }).catch(function (error) {
+            console.error("Error updating document: ", error);
+          });
+          firebase.firestore().collection('game-state').get().then(function (state) {
+            state.docs[0].ref.set({
+              state: 'endRound',
+              czar: getUserName(),
+              winner: player,
+              cardID: id
+            });
+          });
+        }
+      }
     });
-  }
-  else {
-    $("#" + id).click(function () {
-      firebase.firestore().collection('active-cards').doc(id).get().then(function (card) {
-        card.ref.set({
-          selected: true
-        }, { merge: true });
-      }).catch(function (error) {
-        console.error("Error updating document: ", error);
-      });
-    });
-  }
+  });
+
 }
 
 function removeCardFromUI(id) {
@@ -460,6 +487,7 @@ function joinGame() {
       return firebase.firestore().collection('players').add({
         name: getUserName(),
         initials: getInitials(),
+        host: IS_HOST,
         score: 0,
         czar: false
       }).catch(function (error) {
@@ -473,7 +501,7 @@ function joinGame() {
 
 function getInitials() {
   var nameArray = getUserName().split(" ");
-  return nameArray[0].charAt(0) + nameArray[1].charAt(0);
+  return getUserName().substring(0, 3);
 }
 
 function bindPlayers() {
@@ -507,6 +535,7 @@ function bindPlayers() {
           CARDS = fetchJSON('base.json');
         }
         if (player.name == getUserName() && player.host == true) {
+          IS_HOST = true;
           $('.host-only').show();
         }
 
@@ -529,22 +558,12 @@ function displayPlayer(id, initials, score, czar) {
   div.querySelector('.score-initials').textContent = initials + ':';
   div.querySelector('.score-number').textContent = score.toString();
   if (czar) {
-    console.log('czar detected');
+    console.log('new czar: ' + initials);
     $("#" + id).addClass('czar');
   }
   else {
     $("#" + id).removeClass('czar');
   }
-
-  $("#" + id).click(function () {
-    $(this).fadeOut(200, function () {
-      firebase.firestore().collection('players').doc(id).delete().then(function () {
-        //console.log("Player successfully deleted!");
-      }).catch(function (error) {
-        console.error("Error removing document: ", error);
-      });
-    });
-  })
 }
 
 //End CAH functions ###!
