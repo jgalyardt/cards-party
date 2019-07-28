@@ -11,6 +11,19 @@ var IS_IN_GAME = false;
 var SELECTED_CARD = undefined;
 var CARDS = undefined;
 
+String.prototype.hashCode = function() {
+  var hash = 0;
+  if (this.length == 0) {
+      return hash;
+  }
+  for (var i = 0; i < this.length; i++) {
+      var char = this.charCodeAt(i);
+      hash = ((hash<<5)-hash)+char;
+      hash = hash & hash; // Convert to 32bit integer
+  }
+  return hash;
+}
+
 checkSetup();
 initFirebaseAuth();
 $(function () {
@@ -23,7 +36,7 @@ $(function () {
   else {
     $('#controls-container').show();
   }
-  // initializeGame();
+  initializeGame();
   // loadMessages();
 });
 
@@ -31,7 +44,12 @@ $(function () {
 var HAND_CARD_TEMPLATE =
   '<div class="mdl-cell mdl-cell--2-col">' +
   '<div class="hand-card-square mdl-card mdl-shadow--2dp">' +
-  '<div class="card-text mdl-card__supporting-text">' +
+  '<div class="mdl-card__supporting-text">' +
+  '<form action="#">' +
+  '<div class="mdl-textfield mdl-js-textfield">' +
+  '<textarea class="card-text mdl-textfield__input" type="text" rows= "6"></textarea>' +
+  '</div>' +
+  '</form>' +
   '</div>' +
   '</div>' +
   '</div>';
@@ -70,7 +88,17 @@ function initializeGame() {
 
 //Snapshot to the game-state collection and run commands when a change happens
 function bindGameState() {
+
   var query = firebase.firestore()
+    .collection('black-card')
+  query.onSnapshot(function (snapshot) {
+    snapshot.docChanges().forEach(function (change) {
+      var data = change.doc.data();
+      $('#black-text').text(data.text);
+    });
+  });
+
+  query = firebase.firestore()
     .collection('game-state')
   query.onSnapshot(function (snapshot) {
     snapshot.docChanges().forEach(function (change) {
@@ -82,17 +110,19 @@ function bindGameState() {
         $("#join-game").addClass("waiting");
       }
       else if (IS_IN_GAME && data.state == 'bindHand') {
-        bindHand();
+        if (data.mode == 'all-blank') {
+          bindHand('all-blank');
+        }
       }
       else if (data.state == 'endRound') {
+        
         $("#" + data.cardID).addClass('selected');
-
+        $('.czar').removeClass('czar');
         //Only the czar needs to run all these queries
         if (getUserName() == data.czar) {
           //If this card has been selected, delete all other active cards
           var query = firebase.firestore()
             .collection('active-cards')
-            .where('selected', '==', false);
           query.get().then(function (snapshot) {
             snapshot.forEach(function (card) {
               console.log(card);
@@ -130,12 +160,15 @@ function bindGameState() {
 
           //TODO: Deal new hands
         }
+        displayCardInHand('blank' + (Math.random().toString()).hashCode(), '');
+
       }
     });
   });
 }
 
 function hostGame() {
+  CARDS = fetchJSON('base.json');
   var query = firebase.firestore()
     .collection('players')
     .where('name', '==', getUserName());
@@ -159,11 +192,14 @@ function startGame() {
       state: 'init'
     });
   });
-  CARDS = fetchJSON('base.json');
   startFirstTurn('all-blank');
 }
 
 function endGame() {
+  
+  for (var i = 0; i < STARTING_HAND_SIZE; i++) {
+    $('#blankCardInHand' + i.toString()).remove();
+  }
   var cardQuery = firebase.firestore()
     .collection('white-cards')
     .where('assigned', '==', true);
@@ -173,6 +209,17 @@ function endGame() {
       card.ref.set({
         text: card.get('text'),
       });
+    });
+  });
+  var cardQuery = firebase.firestore()
+    .collection('players')
+  cardQuery.get().then(function (players) {
+    //Reset any previously assigned cards
+    players.forEach(function (player) {
+      player.ref.set({
+        score: 0,
+        czar: false
+      }, { merge: true });
     });
   });
   var cardQuery = firebase.firestore()
@@ -190,9 +237,30 @@ function startFirstTurn(gameMode) {
   //Get a random black card
   var blackCard = CARDS['blackCards'][Math.floor(Math.random() * CARDS['blackCards'].length)];
 
+  firebase.firestore().collection('black-card').get().then(function (card) {
+    card.docs[0].ref.set({
+      text: blackCard['text']
+    });
+  });
+
+  
+
   if (gameMode == 'all-blank') {
-    $('#black-text').text(blackCard['text']);
-    
+    firebase.firestore().collection('game-state').get().then(function (state) {
+      state.docs[0].ref.set({
+        state: 'bindHand',
+        mode: 'all-blank'
+      });
+    });
+    var playerQuery = firebase.firestore()
+      .collection('players');
+    playerQuery.get().then(function (players) {
+      //Randomly select a player to start
+      TURN_INDEX = Math.floor(Math.random() * NUM_PLAYERS);
+      players.docs[TURN_INDEX].ref.set({
+        czar: true
+      }, { merge: true });
+    });
   }
   else if (gameMode == 'classic') {
     //FOLLOWING CODE APPLIES TO ORIGINAL CAH RULES
@@ -247,21 +315,29 @@ function startFirstTurn(gameMode) {
 }
 
 //Binds the player's hand to white-cards in firestore where the assignedPlayer field == their username
-function bindHand() {
-  var query = firebase.firestore()
-    .collection('white-cards')
-    .limit(STARTING_HAND_SIZE)
-    .where('assignedPlayer', '==', getUserName());
-  query.onSnapshot(function (snapshot) {
-    snapshot.docChanges().forEach(function (change) {
-      if (change.type == 'removed') {
-        removeCardFromUI(change.doc.id);
-      } else {
-        var card = change.doc.data();
-        displayCardInHand(change.doc.id, card.text);
-      }
+function bindHand(gameMode) {
+  if (gameMode == 'all-blank') {
+    for (var i = 0; i < STARTING_HAND_SIZE; i++) {
+      displayCardInHand('blank' + (Math.random().toString()).hashCode(), '');
+    }
+  }
+  else if (gameMode == 'classic') {
+    var query = firebase.firestore()
+      .collection('white-cards')
+      .limit(STARTING_HAND_SIZE)
+      .where('assignedPlayer', '==', getUserName());
+    query.onSnapshot(function (snapshot) {
+      snapshot.docChanges().forEach(function (change) {
+        if (change.type == 'removed') {
+          removeCardFromUI(change.doc.id);
+        } else {
+          var card = change.doc.data();
+          displayCardInHand(change.doc.id, card.text);
+        }
+      });
     });
-  });
+  }
+
 }
 
 function displayCardInHand(id, text) {
@@ -274,7 +350,10 @@ function displayCardInHand(id, text) {
     div.firstChild.setAttribute('id', id);
     handListElement.appendChild(div);
   }
-  div.querySelector('.card-text').textContent = text;
+  if (text != '') {
+    div.querySelector('.card-text').textContent = text;
+  } 
+  
 
   $("#" + id).click(function () {
     if (SELECTED_CARD != null) {
@@ -287,22 +366,25 @@ function displayCardInHand(id, text) {
 
 function submitCard() {
   //Remove assignedPlayer value from card
-  var cardQuery = firebase.firestore()
-    .collection('white-cards')
-    .where('text', '==', $(SELECTED_CARD).text());
-  cardQuery.get().then(function (cards) {
-    cards.docs[0].ref.set({
-      text: cards.docs[0].get('text')
-    });
-  });
-  return firebase.firestore().collection('active-cards').add({
+
+  // var cardQuery = firebase.firestore()
+  //   .collection('white-cards')
+  //   .where('text', '==', $(SELECTED_CARD).text());
+  // cardQuery.get().then(function (cards) {
+  //   cards.docs[0].ref.set({
+  //     text: cards.docs[0].get('text')
+  //   });
+  // });
+  var div = document.getElementById($(SELECTED_CARD).attr("id"));
+  firebase.firestore().collection('active-cards').add({
     id: $(SELECTED_CARD).attr("id"),
-    text: $(SELECTED_CARD).text(),
+    text: $(div.querySelector('.card-text')).val(),
     player: getUserName(),
     selected: false
   }).catch(function (error) {
     console.error('Error writing new message to Firebase Database', error);
   });
+  $(SELECTED_CARD).parent().remove();
 }
 
 function loadActiveCards() {
@@ -357,7 +439,7 @@ function displayActiveCard(id, text, player, selected) {
 }
 
 function removeCardFromUI(id) {
-  $("#" + id).parent().fadeOut(2000, function () {
+  $("#" + id).parent().fadeOut(4000, function () {
     $(this).remove();
   });
 }
@@ -417,11 +499,12 @@ function bindPlayers() {
       else {
         if (player.name == getUserName()) {
           IS_IN_GAME = true;
-          submitCardElement.setAttribute('disabled',
-            player.czar ? 'true' : 'false');
+          $(submitCardElement).prop('disabled',
+            player.czar ? true : false);
         }
         if (player.host == true) {
           $('#host-game').hide();
+          CARDS = fetchJSON('base.json');
         }
         if (player.name == getUserName() && player.host == true) {
           $('.host-only').show();
@@ -446,7 +529,11 @@ function displayPlayer(id, initials, score, czar) {
   div.querySelector('.score-initials').textContent = initials + ':';
   div.querySelector('.score-number').textContent = score.toString();
   if (czar) {
+    console.log('czar detected');
     $("#" + id).addClass('czar');
+  }
+  else {
+    $("#" + id).removeClass('czar');
   }
 
   $("#" + id).click(function () {
@@ -652,9 +739,9 @@ function displayMessage(id, timestamp, name, text, picUrl, imageUrl) {
 // fields.
 function toggleButton() {
   if (messageInputElement.value) {
-    submitButtonElement.removeAttribute('disabled');
+    $(submitButtonElement).prop('disabled', false);
   } else {
-    submitButtonElement.setAttribute('disabled', 'true');
+    $(submitButtonElement).prop('disabled', true);
   }
 }
 
