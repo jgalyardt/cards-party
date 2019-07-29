@@ -141,7 +141,7 @@ function bindGameState() {
             .where('name', '==', data.winner);
           query.get().then(function (snapshot) {
             snapshot.docs[0].ref.set({
-              score: 1
+              score: snapshot.docs[0].get('score') + 1
             }, { merge: true });
           });
 
