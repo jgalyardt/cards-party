@@ -45,13 +45,11 @@ $(function () {
 var HAND_CARD_TEMPLATE =
   '<div class="mdl-cell mdl-cell--2-col">' +
   '<div class="hand-card-square mdl-card mdl-shadow--2dp">' +
-  '<div class="mdl-card__supporting-text">' +
   '<form action="#">' +
   '<div class="mdl-textfield mdl-js-textfield">' +
-  '<textarea class="card-text mdl-textfield__input" type="text" rows= "6"></textarea>' +
+  '<textarea class="card-text mdl-textfield__input" type="text" rows= "7"></textarea>' +
   '</div>' +
   '</form>' +
-  '</div>' +
   '</div>' +
   '</div>';
 
@@ -124,9 +122,10 @@ function bindGameState() {
         $("#" + data.cardID).addClass('selected');
         $('.czar').removeClass('czar');
         $(submitCardElement).prop('disabled', false);
+
         //Only the host needs to run all these queries
         if (IS_HOST) {
-          //If this card has been selected, delete all other active cards
+          //Delete all active cards
           var query = firebase.firestore()
             .collection('active-cards')
           query.get().then(function (snapshot) {
@@ -394,7 +393,8 @@ function submitCard() {
     id: $(SELECTED_CARD).attr("id"),
     text: $(div.querySelector('.card-text')).val(),
     player: getUserName(),
-    selected: false
+    selected: false,
+    hidden: true
   }).catch(function (error) {
     console.error('Error writing new message to Firebase Database', error);
   });
@@ -413,13 +413,22 @@ function loadActiveCards() {
         removeCardFromUI(change.doc.id);
       } else {
         var card = change.doc.data();
-        displayActiveCard(change.doc.id, card.text, card.player, card.selected);
+        displayActiveCard(change.doc.id, card.text, card.player, card.selected, card.hidden);
+        if ($('#response-container').children().length >= NUM_PLAYERS - 1) {
+          firebase.firestore().collection('active-cards').get().then(function(snapshot) {
+            snapshot.forEach(function(item) {
+              item.ref.set({
+                hidden: false
+              }, { merge: true });
+            });
+          });
+        }
       }
     });
   });
 }
 
-function displayActiveCard(id, text, player, selected) {
+function displayActiveCard(id, text, player, selected, hidden) {
   var div = document.getElementById(id);
   // If an element for that message does not exists yet we create it.
   if (!div) {
@@ -429,40 +438,40 @@ function displayActiveCard(id, text, player, selected) {
     div.firstChild.setAttribute('id', id);
     responseListElement.appendChild(div);
   }
-  div.querySelector('.card-text').textContent = text;
+  if (hidden) {
+    div.querySelector('.card-text').innerHTML = '<p class="hidden-card">?</p>';
+  }
+  else {
+    div.querySelector('.card-text').innerHTML = text;
 
-
-  $("#" + id).click(function () {
-
-
-
-    var query = firebase.firestore()
-      .collection('players')
-      .where('czar', '==', true)
-      .where('name', '==', getUserName());
-    query.get().then(function (snapshot) {
-      if ($('#response-container').children().length == NUM_PLAYERS - 1) {
-        if (snapshot.size > 0) {
-          firebase.firestore().collection('active-cards').doc(id).get().then(function (card) {
-            card.ref.set({
-              selected: true
-            }, { merge: true });
-          }).catch(function (error) {
-            console.error("Error updating document: ", error);
-          });
-          firebase.firestore().collection('game-state').get().then(function (state) {
-            state.docs[0].ref.set({
-              state: 'endRound',
-              czar: getUserName(),
-              winner: player,
-              cardID: id
+    $("#" + id).click(function () {
+      var query = firebase.firestore()
+        .collection('players')
+        .where('czar', '==', true)
+        .where('name', '==', getUserName());
+      query.get().then(function (snapshot) {
+        if ($('#response-container').children().length >= NUM_PLAYERS - 1) {
+          if (snapshot.size > 0) {
+            firebase.firestore().collection('active-cards').doc(id).get().then(function (card) {
+              card.ref.set({
+                selected: true
+              }, { merge: true });
+            }).catch(function (error) {
+              console.error("Error updating document: ", error);
             });
-          });
+            firebase.firestore().collection('game-state').get().then(function (state) {
+              state.docs[0].ref.set({
+                state: 'endRound',
+                czar: getUserName(),
+                winner: player,
+                cardID: id
+              });
+            });
+          }
         }
-      }
+      });
     });
-  });
-
+  }
 }
 
 function removeCardFromUI(id) {
@@ -501,7 +510,7 @@ function joinGame() {
 
 function getInitials() {
   var nameArray = getUserName().split(" ");
-  return getUserName().substring(0, 3);
+  return getUserName().substring(0, 7);
 }
 
 function bindPlayers() {
@@ -649,10 +658,11 @@ function onMessageFormSubmit(e) {
 // Triggers when the auth state change for instance when the user signs-in or signs-out.
 function authStateObserver(user) {
   if (user) { // User is signed in!
-    $('#sign-in-message').hide();
+    //$('#sign-in-message').hide();
+    $('#user-container').hide();
     $('#controls-container').show();
     // Show user's profile and sign-out button.
-    signOutButtonElement.removeAttribute('hidden');
+    //signOutButtonElement.removeAttribute('hidden');
 
     // Hide sign-in button.
     signInButtonElement.setAttribute('hidden', 'true');

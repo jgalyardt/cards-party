@@ -18,6 +18,16 @@ function resetWhiteCards(deckSize = 20) {
   });
 }
 
+function deleteCollection(name) {
+  var query = firebase.firestore()
+    .collection(name)
+  query.get().then(function (snapshot) {
+    snapshot.forEach(function (item) {
+      item.ref.delete();
+    });
+  });
+}
+
 function resetJoinGame() {
   $("#join-game").prop("disabled", false);
   $("#join-game").addClass("waiting");
