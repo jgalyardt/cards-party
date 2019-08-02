@@ -10,6 +10,7 @@ var MAX_SCORE = 8;
 var IS_HOST = false;
 var IS_IN_GAME = false;
 var SELECTED_CARD = undefined;
+var CARD_SETS = [];
 var CARDS = undefined;
 
 String.prototype.hashCode = function () {
@@ -48,6 +49,28 @@ $(function () {
       $('#card-sets-container').hide();
       $('#response-container').show();
     }
+  });
+
+  $(':checkbox').each(function(index) {
+    if ($(this).is(':checked')) {
+      console.log($(this));
+      var setName = $(this).attr('id');
+      CARD_SETS.append(setName.substring(8, setName.length));
+    };
+  });
+
+  $(':checkbox').click(function() {
+    console.log($(this).attr('id'));
+    if ($(this).is(':checked')) {
+      var setName = $(this).attr('id');
+      CARD_SETS.push(setName.substring(8, setName.length));
+    }
+    else {
+      var setName = $(this).attr('id');
+      setName = setName.substring(8, setName.length);
+      CARD_SETS.splice(CARD_SETS.indexOf(setName), 1);
+    }
+    CARDS = fetchJSON(CARD_SETS);
   });
 
   initializeGame();
@@ -196,7 +219,7 @@ function bindGameState() {
 
 function hostGame() {
   IS_HOST = true;
-  CARDS = fetchJSON('base.json');
+  CARDS = fetchJSON(CARD_SETS);
   firebase.firestore().collection('game-state').get().then(function (state) {
     state.docs[0].ref.set({
       state: 'gameReady'
@@ -216,10 +239,11 @@ function startGame() {
 }
 
 function newBlackCard() {
-  var blackCard = CARDS['blackCards'][Math.floor(Math.random() * CARDS['blackCards'].length)];
-  while (blackCard['pick'] != 1) {
-    blackCard = CARDS['blackCards'][Math.floor(Math.random() * CARDS['blackCards'].length)];
-  }
+  var randomSet = Math.floor(Math.random() * CARDS.length);
+  var blackCard = CARDS[randomSet]['blackCards'][Math.floor(Math.random() * CARDS[randomSet]['blackCards'].length)];
+  // while (blackCard['pick'] != 1) {
+  //   blackCard = CARDS['blackCards'][Math.floor(Math.random() * CARDS['blackCards'].length)];
+  // }
 
   firebase.firestore().collection('black-card').get().then(function (card) {
     card.docs[0].ref.set({
@@ -554,7 +578,7 @@ function bindPlayers() {
         }
         if (player.host == true) {
           $('#host-game').hide();
-          CARDS = fetchJSON('base.json');
+          CARDS = fetchJSON(CARD_SETS);
         }
         if (player.name == getUserName() && player.host == true) {
           IS_HOST = true;

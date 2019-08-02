@@ -34,19 +34,23 @@ function resetJoinGame() {
   return 'Reset join button';
 }
 
-function fetchJSON(setName) {
-  var json = (function () {
-    var json = null;
-    $.ajax({
-      'async': false,
-      'global': false,
-      'url': "cards/" + setName,
-      'dataType': "json",
-      'success': function (data) {
-        json = data;
-      }
-    });
-    return json;
-  })();
-  return json;
+function fetchJSON(sets) {
+  var allCards = [];
+  for (var i = 0; i < sets.length; i++) {
+    var json = (function () {
+      var json = null;
+      $.ajax({
+        'async': false,
+        'global': false,
+        'url': "cards/" + sets[i] + '.json',
+        'dataType': "json",
+        'success': function (data) {
+          json = data;
+        }
+      });
+      return json;
+    })();
+    allCards.push(json);
+  }
+  return allCards;
 }
