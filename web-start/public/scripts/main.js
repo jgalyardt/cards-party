@@ -31,12 +31,25 @@ $(function () {
 
   $('#controls-container').hide();
   $('.host-only').hide();
+  $('#card-sets-container').hide();
   if (isUserSignedIn) {
     $('#sign-in-message').hide();
   }
   else {
     $('#controls-container').show();
   }
+
+  $('#card-sets').click(function () {
+    if ($('#response-container').is(':visible')) {
+      $('#response-container').hide();
+      $('#card-sets-container').show();
+    }
+    else {
+      $('#card-sets-container').hide();
+      $('#response-container').show();
+    }
+  });
+
   initializeGame();
   loadMessages();
 });
@@ -808,6 +821,7 @@ hostGameElement.addEventListener('click', hostGame);
 joinGameElement.addEventListener('click', joinGame);
 startGameElement.addEventListener('click', startGame);
 endGameElement.addEventListener('click', endGame);
+
 
 // Saves message on form submit.
 messageFormElement.addEventListener('submit', onMessageFormSubmit);
